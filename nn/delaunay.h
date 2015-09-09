@@ -48,6 +48,55 @@ struct delaunay;
 typedef struct delaunay delaunay;
 #endif
 
+
+// The ifdef checks are necessary to prevent name mangling between C and C++ (CUDA)
+#ifdef __cplusplus
+    extern "C" {
+        struct delaunay {
+            int npoints;
+            point* points;
+            double xmin;
+            double xmax;
+            double ymin;
+            double ymax;
+
+            int ntriangles;
+            triangle* triangles;
+            circle* circles;
+            triangle_neighbours* neighbours;    /* for delaunay_xytoi() */
+
+            int* n_point_triangles;     /* n_point_triangles[i] is number of
+                                         * triangles i-th point belongs to */
+            int** point_triangles;      /* point_triangles[i][j] is index of j-th
+                                         * triangle i-th point belongs to */
+
+            int nedges;
+            int* edges;                 /* n-th edge is formed by points[edges[n*2]]
+                                         * and points[edges[n*2+1]] */
+
+            /*
+             * Work data for delaunay_circles_find(). Placed here for efficiency
+             * reasons. Should be moved to the procedure if parallelizable code
+             * needed.
+             */
+            int* flags;
+            int first_id;               /* last search result, used in start up of a
+                                         * new search */
+            istack* t_in;
+            istack* t_out;
+
+            /*
+             * to keep track of flags set to 1 in the case of very large data sets
+             */
+            int nflags;
+            int nflagsallocated;
+            int* flagids;
+        };
+
+        void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
+        int delaunay_xytoi(delaunay* d, point* p, int seed);
+    }
+#else
 /** Structure to perform the Delaunay triangulation of a given array of points.
  *
  * Contains a deep copy of the input array of points.
@@ -101,5 +150,8 @@ struct delaunay {
  */
 void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
 int delaunay_xytoi(delaunay* d, point* p, int seed);
+
+#endif
+
 
 #endif

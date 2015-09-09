@@ -18,6 +18,29 @@
 #if !defined(_NN_INTERNAL_H)
 #define _NN_INTERNAL_H
 
+// The ifdef checks are necessary to prevent name mangling between C and C++ (CUDA)
+#ifdef __cplusplus
+    extern "C" {
+
+        /*
+         * nnpi.c
+         */
+        void nnpi_calculate_weights(nnpi* nn, point* p);
+        int nnpi_get_nvertices(nnpi* nn);
+        int* nnpi_get_vertices(nnpi* nn);
+        double* nnpi_get_weights(nnpi* nn);
+
+        /*
+         * nncommon.c, nncommon-vulnerable.c
+         */
+        int circle_build1(circle* c, point* p0, point* p1, point* p2);
+        int circle_build2(circle* c, point* p0, point* p1, point* p2);
+        int circle_contains(circle* c, point* p);
+        void nn_quit(char const* format, ...);
+        int str2double(char* token, double* value);
+    };
+#else
+
 /*
  * nnpi.c
  */
@@ -32,7 +55,8 @@ double* nnpi_get_weights(nnpi* nn);
 int circle_build1(circle* c, point* p0, point* p1, point* p2);
 int circle_build2(circle* c, point* p0, point* p1, point* p2);
 int circle_contains(circle* c, point* p);
-void nn_quit(char* format, ...);
+void nn_quit(char const* format, ...);
 int str2double(char* token, double* value);
 
+#endif
 #endif

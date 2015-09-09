@@ -17,6 +17,31 @@
 #ifndef _HASH_H
 #define _HASH_H
 
+// The ifdef checks are necessary to prevent name mangling between C and C++ (CUDA)
+#ifdef __cplusplus
+    extern "C" {
+        struct hashtable;
+        typedef struct hashtable hashtable;
+        typedef void* (*ht_keycp) (void*);
+        typedef int (*ht_keyeq) (void*, void*);
+        typedef unsigned int (*ht_key2hash) (void*);
+        hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash);
+        hashtable* ht_create_d1(int size);      /* double[1] */
+        hashtable* ht_create_d2(int size);      /* double[2] */
+        hashtable* ht_create_str(int size);     /* char* */
+        hashtable* ht_create_i1(int size);      /* int[1] */
+        hashtable* ht_create_i2(int size);      /* int[2] */
+        void ht_destroy(hashtable* table);
+        void* ht_insert(hashtable* table, void* key, void* data);
+        void* ht_find(hashtable* table, void* key);
+        void* ht_delete(hashtable* table, void* key);
+        void ht_process(hashtable* table, void (*func) (void*));
+        int ht_getnentries(hashtable* table);
+        int ht_getsize(hashtable* table);
+        int ht_getnfilled(hashtable* table);
+    };
+#else
+
 struct hashtable;
 typedef struct hashtable hashtable;
 
@@ -114,5 +139,8 @@ int ht_getsize(hashtable* table);
  * @return The number of table elements filled
  */
 int ht_getnfilled(hashtable* table);
+#endif
+
+
 
 #endif                          /* _HASH_H */

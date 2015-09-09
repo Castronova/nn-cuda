@@ -141,6 +141,7 @@ static void usage()
     exit(0);
 }
 
+// tony: changed char* to char const* b/c string literals are being passed in
 static void quit(char const* format, ...)
 {
     va_list args;

@@ -24,6 +24,24 @@ struct istack;
 typedef struct istack istack;
 #endif
 
+// The ifdef checks are necessary to prevent name mangling between C and C++ (CUDA)
+#ifdef __cplusplus
+    extern "C"{
+        struct istack {
+            int n;
+            int nallocated;
+            int* v;
+        };
+
+        istack* istack_create(void);
+        void istack_destroy(istack* s);
+        void istack_push(istack* s, int v);
+        int istack_pop(istack* s);
+        int istack_contains(istack* s, int v);
+        void istack_reset(istack* s);
+    };
+#else
+
 struct istack {
     int n;
     int nallocated;
@@ -36,5 +54,6 @@ void istack_push(istack* s, int v);
 int istack_pop(istack* s);
 int istack_contains(istack* s, int v);
 void istack_reset(istack* s);
+#endif
 
 #endif

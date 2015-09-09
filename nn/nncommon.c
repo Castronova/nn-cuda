@@ -47,7 +47,7 @@ NN_RULE nn_rule = SIBSON;
 
 #include "version.h"
 
-void nn_quit(char* format, ...)
+void nn_quit(char const* format, ...)
 {
     va_list args;
 

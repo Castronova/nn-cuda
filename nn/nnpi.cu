@@ -106,14 +106,21 @@ struct nnpi {
  */
 nnpi* nnpi_create(delaunay* d)
 {
-    nnpi* nn = malloc(sizeof(nnpi));
+//    nnpi* nn = malloc(sizeof(nnpi));
+    // tony: this is necessary because of nvcc "C" compiling
+    nnpi* nn;
+    nn = (nnpi*) malloc(sizeof(nnpi));
 
     nn->d = d;
     nn->wmin = -DBL_MAX;
     nn->n = 0;
     nn->ncircles = 0;
-    nn->vertices = calloc(NSTART, sizeof(int));
-    nn->weights = calloc(NSTART, sizeof(double));
+
+    // tony: this is necessary because of nvcc "C" compiling
+    nn->vertices = (int*) calloc(NSTART, sizeof(int));
+    // tony: this is necessary because of nvcc "C" compiling
+    nn->weights = (double*) calloc(NSTART, sizeof(double));
+
     nn->nvertices = 0;
     nn->nallocated = NSTART;
     nn->bad = NULL;
@@ -164,8 +171,9 @@ static void nnpi_add_weight(nnpi* nn, int vertex, double w)
          * get more memory if necessary 
          */
         if (nn->nvertices == nn->nallocated) {
-            nn->vertices = realloc(nn->vertices, (nn->nallocated + NINC) * sizeof(int));
-            nn->weights = realloc(nn->weights, (nn->nallocated + NINC) * sizeof(double));
+            // tony: (int*)this is necessary because of nvcc "C" compiling
+            nn->vertices = (int*) realloc(nn->vertices, (nn->nallocated + NINC) * sizeof(int));
+            nn->weights = (double*) realloc(nn->weights, (nn->nallocated + NINC) * sizeof(double));
             nn->nallocated += NINC;
         }
 
@@ -271,10 +279,13 @@ static void nnpi_triangle_process(nnpi* nn, point* p, int i)
                 nn->bad = ht_create_i2(HT_SIZE);
 
             key[1] = (j1bad) ? t->vids[j2] : t->vids[j1];
-            v = ht_find(nn->bad, &key);
+
+            // tony: (double*) this is necessary because of nvcc "C" compiling
+            v = (double*) ht_find(nn->bad, &key);
 
             if (v == NULL) {
-                v = malloc(8 * sizeof(double));
+                // tony: (double*) this is necessary because of nvcc "C" compiling
+                v = (double*) malloc(8 * sizeof(double));
                 if (j1bad) {
                     v[0] = cs[j2].x;
                     v[1] = cs[j2].y;
@@ -387,7 +398,8 @@ static void nnpi_getneighbours(nnpi* nn, point* p, int nt, int* tids, int* n, in
     }
     qsort(neighbours->v, neighbours->n, sizeof(int), compare_int);
 
-    v = malloc(sizeof(indexedpoint) * neighbours->n);
+    // tony: (indexedpoint*) this is necessary because of nvcc "C" compiling
+    v = (indexedpoint*) malloc(sizeof(indexedpoint) * neighbours->n);
 
     v[0].p = &d->points[neighbours->v[0]];
     v[0].i = neighbours->v[0];
@@ -416,7 +428,8 @@ static void nnpi_getneighbours(nnpi* nn, point* p, int nt, int* tids, int* n, in
         qsort(&v[1], *n - 1, sizeof(indexedpoint), compare_indexedpoints);
     }
 
-    (*nids) = malloc(*n * sizeof(int));
+    // tony: (int*) this is necessary because of nvcc "C" compiling
+    (*nids) = (int*) malloc(*n * sizeof(int));
 
     for (i = 0; i < *n; ++i)
         (*nids)[i] = v[i].i;
@@ -564,9 +577,10 @@ void nnpi_calculate_weights(nnpi* nn, point* p)
 
     nvertices = nn->nvertices;
     if (nvertices > 0) {
-        vertices = malloc(nvertices * sizeof(int));
+        // tony: (int*) this is necessary because of nvcc "C" compiling
+        vertices = (int*) malloc(nvertices * sizeof(int));
         memcpy(vertices, nn->vertices, nvertices * sizeof(int));
-        weights = malloc(nvertices * sizeof(double));
+        weights = (double*) malloc(nvertices * sizeof(double));
         memcpy(weights, nn->weights, nvertices * sizeof(double));
     }
 
@@ -629,7 +643,8 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
             indexedvalue* ivs = NULL;
 
             if (nn->nvertices > 0) {
-                ivs = malloc(nn->nvertices * sizeof(indexedvalue));
+                // tony: (indexedvalue*) this is necessary because of nvcc "C" compiling
+                ivs = (indexedvalue*) malloc(nn->nvertices * sizeof(indexedvalue));
 
                 for (i = 0; i < nn->nvertices; ++i) {
                     ivs[i].i = nn->vertices[i];
@@ -795,7 +810,8 @@ typedef struct {
  */
 nnhpi* nnhpi_create(delaunay* d, int size)
 {
-    nnhpi* nn = malloc(sizeof(nnhpi));
+    // tony: (nnhpi*) this is necessary because of nvcc "C" compiling
+    nnhpi* nn = (nnhpi*) malloc(sizeof(nnhpi));
     int i;
 
     nn->nnpi = nnpi_create(d);
@@ -845,15 +861,17 @@ void nnhpi_interpolate(nnhpi* nnhpi, point* p)
     int i;
 
     if (ht_find(ht_weights, p) != NULL) {
-        weights = ht_find(ht_weights, p);
+        // tony: (nn_weights*) this is necessary because of nvcc "C" compiling
+        weights = (nn_weights*) ht_find(ht_weights, p);
         if (nn_verbose)
             fprintf(stderr, "  <hashtable>\n");
     } else {
         nnpi_calculate_weights(nnpi, p);
 
-        weights = malloc(sizeof(nn_weights));
-        weights->vertices = malloc(sizeof(int) * nnpi->nvertices);
-        weights->weights = malloc(sizeof(double) * nnpi->nvertices);
+        // tony: (nn_weights*) this is necessary because of nvcc "C" compiling
+        weights = (nn_weights*) malloc(sizeof(nn_weights));
+        weights->vertices = (int*) malloc(sizeof(int) * nnpi->nvertices);
+        weights->weights = (double*) malloc(sizeof(double) * nnpi->nvertices);
 
         weights->nvertices = nnpi->nvertices;
 
@@ -924,7 +942,8 @@ void nnhpi_interpolate(nnhpi* nnhpi, point* p)
  */
 void nnhpi_modify_data(nnhpi* nnhpi, point* p)
 {
-    point* orig = ht_find(nnhpi->ht_data, p);
+    // tony: (point*) this is necessary because of nvcc "C" compiling
+    point* orig = (point*) ht_find(nnhpi->ht_data, p);
 
     assert(orig != NULL);
     orig->z = p->z;
