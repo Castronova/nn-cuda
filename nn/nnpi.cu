@@ -73,6 +73,7 @@
 #include "delaunay.h"
 #include "nn.cuh"
 #include "nn_internal.h"
+#include "cuda_runtime.h"
 
 struct nnpi {
     delaunay* d;
@@ -98,6 +99,9 @@ struct nnpi {
 #define EPS_WMIN 1.0e-6
 #define HT_SIZE 100
 #define EPS_SAME 1.0e-8
+
+__device__ int dev_nn_verbose;
+__device__ int dev_nn_test_vertice;
 
 /* Creates Natural Neighbours point interpolator.
  *
@@ -139,7 +143,7 @@ void nnpi_destroy(nnpi* nn)
     free(nn);
 }
 
-void nnpi_reset(nnpi* nn)
+__device__ void nnpi_reset(nnpi* nn)
 {
     nn->nvertices = 0;
     nn->ncircles = 0;
@@ -545,7 +549,7 @@ static void nnpi_normalize_weights(nnpi* nn)
 
 #define RANDOM (double) rand() / ((double) RAND_MAX + 1.0)
 
-void nnpi_calculate_weights(nnpi* nn, point* p)
+__device__ void nnpi_calculate_weights(nnpi* nn, point* p)
 {
     point pp;
     int nvertices = 0;
@@ -614,6 +618,7 @@ typedef struct {
     int i;
 } indexedvalue;
 
+/*
 static int cmp_iv(const void* p1, const void* p2)
 {
     double v1 = *((indexedvalue *) p1)->v;
@@ -625,21 +630,23 @@ static int cmp_iv(const void* p1, const void* p2)
         return 1;
     return 0;
 }
+*/
 
 /* Performs Natural Neighbours interpolation in a point.
  *
  * @param nn NN interpolation
  * @param p Point to be interpolated (p->x, p->y -- input; p->z -- output)
  */
-void nnpi_interpolate_point(nnpi* nn, point* p)
+__device__ void nnpi_interpolate_point(nnpi* nn, point* p)
 {
     delaunay* d = nn->d;
     int i;
 
     nnpi_calculate_weights(nn, p);
 
-    if (nn_verbose) {
-        if (nn_test_vertice == -1) {
+    /*
+    if (dev_nn_verbose) {
+        if (dev_nn_test_vertice == -1) {
             indexedvalue* ivs = NULL;
 
             if (nn->nvertices > 0) {
@@ -671,9 +678,9 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
             double w = 0.0;
 
             if (nn->n == 0)
-                fprintf(stderr, "weight of vertex %d:\n", nn_test_vertice);
+                fprintf(stderr, "weight of vertex %d:\n", dev_nn_test_vertice);
             for (i = 0; i < nn->nvertices; ++i) {
-                if (nn->vertices[i] == nn_test_vertice) {
+                if (nn->vertices[i] == dev_nn_test_vertice) {
                     w = nn->weights[i];
                     break;
                 }
@@ -681,6 +688,7 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
             fprintf(stderr, "  (%.10g, %.10g): %.7g\n", p->x, p->y, w);
         }
     }
+     */
 
     nn->n++;
 
@@ -701,6 +709,16 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
     }
 }
 
+
+__global__ void cuda_nn_interpolate(nnpi *dev_nn, point *dev_pout, int nout)
+{
+    // tony: todo, split into parallel blocks, page 61
+    for (int i = 0; i < nout; ++i)
+    {
+        nnpi_interpolate_point(dev_nn, &dev_pout[i]);
+    }
+}
+
 /* Performs Natural Neighbours interpolation for an array of points.
  *
  * @param nin Number of input points
@@ -713,11 +731,12 @@ void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point 
 {
     delaunay* d = delaunay_build(nin, pin, 0, NULL, 0, NULL);
     nnpi* nn = nnpi_create(d);
-    int seed = 0;
-    int i;
+//    int seed = 0;
+//    int i;
 
     nnpi_setwmin(nn, wmin);
 
+    /*
     if (nn_verbose) {
         fprintf(stderr, "xytoi:\n");
         for (i = 0; i < nout; ++i) {
@@ -726,10 +745,35 @@ void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point 
             fprintf(stderr, "(%.7g,%.7g) -> %d\n", p->x, p->y, delaunay_xytoi(d, p, seed));
         }
     }
+     */
 
-    for (i = 0; i < nout; ++i)
-        nnpi_interpolate_point(nn, &pout[i]);
+    // tony: move pout and nn over to the device
+    point *dev_pout;
+    nnpi *dev_nn;
+    cudaMalloc( (void **) &dev_pout, nout* sizeof(point));
+    cudaMalloc( (void **) &dev_nn, sizeof(nnpi));
+    cudaMemcpy(dev_pout, pout, nout*sizeof(point), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_nn, nn, sizeof(nnpi), cudaMemcpyHostToDevice);
 
+    // tony: move over some other variables that only exist on the host as of now
+//    int *dev_nn_verbose;
+//    cudaMalloc((void **) &dev_nn_verbose, sizeof(int));
+
+    cudaMemcpyFromSymbol(&nn_verbose, "dev_nn_verbose", sizeof(int), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyFromSymbol(&nn_test_vertice, "dev_nn_test_vertice", sizeof(int), 0, cudaMemcpyHostToDevice);
+
+
+    // tony: call cuda_nn_interpolate. todo, split into parallel blocks
+    cuda_nn_interpolate<<<1,1>>>(dev_nn, dev_pout, nout);
+
+    // tony: free the allocated memory
+    cudaFree(dev_nn);
+    cudaFree(dev_pout);
+
+//    for (i = 0; i < nout; ++i)
+//        nnpi_interpolate_point(nn, &pout[i]);
+
+    /*
     if (nn_verbose) {
         fprintf(stderr, "output:\n");
         for (i = 0; i < nout; ++i) {
@@ -738,10 +782,14 @@ void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point 
             fprintf(stderr, "  %d:%15.7g %15.7g %15.7g\n", i, p->x, p->y, p->z);
         }
     }
+    */
 
     nnpi_destroy(nn);
     delaunay_destroy(d);
 }
+
+
+
 
 /* Sets minimal allowed weight for Natural Neighbours interpolation.
  *

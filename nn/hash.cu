@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <math.h>
 #include "hash.h"
+#include "cuda_runtime.h"
 
 #define INT_PER_DOUBLE 2
 #define BYTE_PER_INT 4
@@ -51,7 +52,8 @@ struct hashtable {
  */
 hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash)
 {
-    hashtable* table = malloc(sizeof(hashtable));
+    // tony: (hashtable*)
+    hashtable* table = (hashtable*) malloc(sizeof(hashtable));
     ht_bucket** bucket;
     int i;
 
@@ -63,7 +65,8 @@ hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash)
     }
 
     table->size = size;
-    table->table = malloc(sizeof(ht_bucket*) * size);
+    // tony: (ht_bucket**)
+    table->table = (ht_bucket**) malloc(sizeof(ht_bucket*) * size);
     assert(table->table != NULL);
     bucket = table->table;
 
@@ -90,7 +93,7 @@ hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash)
  *
  * @param table Hash table to be destroyed
  */
-void ht_destroy(hashtable* table)
+__device__ void ht_destroy(hashtable* table)
 {
     int i;
 
@@ -132,7 +135,8 @@ void* ht_insert(hashtable* table, void* key, void* data)
      * pointing at it. 
      */
     if ((table->table)[val] == NULL) {
-        bucket = malloc(sizeof(ht_bucket));
+        // tony: (ht_bucket*)
+        bucket = (ht_bucket*) malloc(sizeof(ht_bucket));
         assert(bucket != NULL);
 
         bucket->key = table->cp(key);
@@ -288,7 +292,8 @@ void ht_process(hashtable* table, void (*func) (void*))
 
 static unsigned int strhash(void* key)
 {
-    char* str = key;
+    // tony: (char*)
+    char* str = (char *) key;
     unsigned int hashvalue = 0;
 
     while (*str != 0) {
@@ -302,19 +307,22 @@ static unsigned int strhash(void* key)
 
 static void* strcp(void* key)
 {
-    return strdup(key);
+    // tony: (const char*)
+    return strdup((const char*) key);
 }
 
 static int streq(void* key1, void* key2)
 {
-    return !strcmp(key1, key2);
+    // tony: (const char*)
+    return !strcmp((const char*) key1, (const char*) key2);
 }
 
 /* functions for for double keys */
 
 static unsigned int d1hash(void* key)
 {
-    unsigned int* v = key;
+    // tony: (unsigned int*)
+    unsigned int* v = (unsigned int*) key;
 
 #if INT_PER_DOUBLE == 2
     return v[0] + v[1];
@@ -325,7 +333,8 @@ static unsigned int d1hash(void* key)
 
 static void* d1cp(void* key)
 {
-    double* newkey = malloc(sizeof(double));
+    // tony: (double*)
+    double* newkey = (double *) malloc(sizeof(double));
 
     *newkey = *(double*) key;
 
@@ -343,7 +352,8 @@ static int d1eq(void* key1, void* key2)
 
 static unsigned int d2hash(void* key)
 {
-    unsigned int* v = key;
+    // tony: (unsigned int*)
+    unsigned int* v = (unsigned int*) key;
 
 #if INT_PER_DOUBLE == 2
     /*
@@ -358,7 +368,8 @@ static unsigned int d2hash(void* key)
 
 static void* d2cp(void* key)
 {
-    double* newkey = malloc(sizeof(double) * 2);
+    // tony: (double*)
+    double* newkey = (double*) malloc(sizeof(double) * 2);
 
     newkey[0] = ((double*) key)[0];
     newkey[1] = ((double*) key)[1];
@@ -382,7 +393,8 @@ static unsigned int i1hash(void* key)
 
 static void* i1cp(void* key)
 {
-    int* newkey = malloc(sizeof(int));
+    //tony: (int*)
+    int* newkey = (int*) malloc(sizeof(int));
 
     newkey[0] = ((int*) key)[0];
 
@@ -401,7 +413,8 @@ static int i1eq(void* key1, void* key2)
 static unsigned int i2hash(void* key)
 {
 #if BYTE_PER_INT >= 4
-    unsigned int* v = key;
+    // tony: (unsigned int*)
+    unsigned int* v = (unsigned int*:) key;
 
     return v[0] + (v[1] << 16);
 #else
@@ -411,7 +424,8 @@ static unsigned int i2hash(void* key)
 
 static void* i2cp(void* key)
 {
-    int* newkey = malloc(sizeof(int) * 2);
+    // tony (int*)
+    int* newkey = (int*) malloc(sizeof(int) * 2);
 
     newkey[0] = ((int*) key)[0];
     newkey[1] = ((int*) key)[1];

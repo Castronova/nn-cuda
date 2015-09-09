@@ -524,6 +524,7 @@ int main(int argc, char* argv[])
     if (s->linear)
         lpi_interpolate_points(nin, pin, nout, pout);
     else
+        // tony: this is the main computation point
         nnpi_interpolate_points(nin, pin, s->wmin, nout, pout);
 
     if (s->invariant)

@@ -69,7 +69,7 @@ typedef struct delaunay delaunay;
 
     nnpi* nnpi_create(delaunay* d);
     void nnpi_destroy(nnpi* nn);
-    void nnpi_interpolate_point(nnpi* nn, point* p);
+//    void nnpi_interpolate_point(nnpi* nn, point* p);
     void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point pout[]);
     void nnpi_setwmin(nnpi* nn, double wmin);
 
@@ -93,6 +93,9 @@ typedef struct delaunay delaunay;
     extern NN_RULE nn_rule;
     extern char* nn_version;
     extern int nn_test_vertice;
+
+//    __global__ void cuda_nn_interpolate(nnpi *dev_nn, point *dev_pout, int nout);
+
     };
 #else
 
@@ -259,7 +262,7 @@ void nnpi_destroy(nnpi* nn);
  * @param nn NN point interpolator
  * @param p Point to be interpolated (p->x, p->y -- input; p->z -- output)
  */
-void nnpi_interpolate_point(nnpi* nn, point* p);
+//void nnpi_interpolate_point(nnpi* nn, point* p);
 
 /** Performs Natural Neighbours interpolation in an array of points.
  *
@@ -402,6 +405,8 @@ extern char* nn_version;
  * debugging purposes).
  */
 extern int nn_test_vertice;
+
+//void cuda_nn_interpolate(nnpi *dev_nn, point *dev_pout, int nout);
 #endif
 
 
