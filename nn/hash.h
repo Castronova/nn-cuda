@@ -31,7 +31,7 @@
         hashtable* ht_create_str(int size);     /* char* */
         hashtable* ht_create_i1(int size);      /* int[1] */
         hashtable* ht_create_i2(int size);      /* int[2] */
-        void ht_destroy(hashtable* table);
+        __device__ void ht_destroy(hashtable* table);
         void* ht_insert(hashtable* table, void* key, void* data);
         void* ht_find(hashtable* table, void* key);
         void* ht_delete(hashtable* table, void* key);
@@ -80,7 +80,7 @@ hashtable* ht_create_i2(int size);      /* int[2] */
  *
  * @param table Hash table to be destroyed
  */
-void ht_destroy(hashtable* table);
+__device__ void ht_destroy(hashtable* table);
 
 /** Inserts a new entry into the hash table.
  *

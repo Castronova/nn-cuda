@@ -153,7 +153,7 @@ __device__ void nnpi_reset(nnpi* nn)
     }
 }
 
-static void nnpi_add_weight(nnpi* nn, int vertex, double w)
+__device__ static void nnpi_add_weight(nnpi* nn, int vertex, double w)
 {
     int i;
 
@@ -196,7 +196,7 @@ static void nnpi_add_weight(nnpi* nn, int vertex, double w)
  * that the vertices of the delaunay triangulation are listed in uniform
  * (clockwise or counterclockwise) order.
  */
-static void nnpi_triangle_process(nnpi* nn, point* p, int i)
+__device__ static void nnpi_triangle_process(nnpi* nn, point* p, int i)
 {
     delaunay* d = nn->d;
     triangle* t = &d->triangles[i];
@@ -386,7 +386,7 @@ static int compare_indexedpoints(const void* pp1, const void* pp2)
     }
 }
 
-static void nnpi_getneighbours(nnpi* nn, point* p, int nt, int* tids, int* n, int** nids)
+__device__ static void nnpi_getneighbours(nnpi* nn, point* p, int nt, int* tids, int* n, int** nids)
 {
     delaunay* d = nn->d;
     istack* neighbours = istack_create();
@@ -442,7 +442,7 @@ static void nnpi_getneighbours(nnpi* nn, point* p, int nt, int* tids, int* n, in
     free(v);
 }
 
-static int nnpi_neighbours_process(nnpi* nn, point* p, int n, int* nids)
+__device__ static int nnpi_neighbours_process(nnpi* nn, point* p, int n, int* nids)
 {
     delaunay* d = nn->d;
     int i;
@@ -489,7 +489,7 @@ static int nnpi_neighbours_process(nnpi* nn, point* p, int n, int* nids)
     return 1;
 }
 
-static int _nnpi_calculate_weights(nnpi* nn, point* p)
+__device__ static int _nnpi_calculate_weights(nnpi* nn, point* p)
 {
     int* tids = NULL;
     int i;
@@ -534,7 +534,7 @@ static int _nnpi_calculate_weights(nnpi* nn, point* p)
     return 0;
 }
 
-static void nnpi_normalize_weights(nnpi* nn)
+__device__ static void nnpi_normalize_weights(nnpi* nn)
 {
     int n = nn->nvertices;
     double sum = 0.0;

@@ -414,7 +414,7 @@ static unsigned int i2hash(void* key)
 {
 #if BYTE_PER_INT >= 4
     // tony: (unsigned int*)
-    unsigned int* v = (unsigned int*:) key;
+    unsigned int* v = (unsigned int*) key;
 
     return v[0] + (v[1] << 16);
 #else
