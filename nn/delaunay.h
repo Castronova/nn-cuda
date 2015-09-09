@@ -93,7 +93,7 @@ typedef struct delaunay delaunay;
             int* flagids;
         };
 
-        void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
+        __device__ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
         int delaunay_xytoi(delaunay* d, point* p, int seed);
     }
 #else
@@ -148,7 +148,7 @@ struct delaunay {
 /*
  * delaunay_build() and delaunay_destroy() belong to "nn.h"
  */
-void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
+__device__ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
 int delaunay_xytoi(delaunay* d, point* p, int seed);
 
 #endif

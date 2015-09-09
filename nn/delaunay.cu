@@ -38,6 +38,7 @@
 #include "delaunay.h"
 #include "nn.cuh"
 #include "nn_internal.h"
+#include "cuda_runtime.h"
 
 /*
  * This parameter is used in search of tricircles containing a given point:
@@ -111,7 +112,8 @@ static void tio_destroy(struct triangulateio* tio)
 
 static delaunay* delaunay_create()
 {
-    delaunay* d = malloc(sizeof(delaunay));
+    // tony: added type cast for nvcc compiler
+    delaunay* d = (delaunay*) malloc(sizeof(delaunay));
 
     d->npoints = 0;
     d->points = NULL;
@@ -174,12 +176,13 @@ static void tio2delaunay(struct triangulateio* tio_out, delaunay* d)
 
     d->ntriangles = tio_out->numberoftriangles;
     if (d->ntriangles > 0) {
-        d->triangles = malloc(d->ntriangles * sizeof(triangle));
-        d->neighbours = malloc(d->ntriangles * sizeof(triangle_neighbours));
-        d->circles = malloc(d->ntriangles * sizeof(circle));
-        d->n_point_triangles = calloc(d->npoints, sizeof(int));
-        d->point_triangles = malloc(d->npoints * sizeof(int*));
-        d->flags = calloc(d->ntriangles, sizeof(int));
+        // tony: added type casts for nvcc compiler
+        d->triangles = (triangle*) malloc(d->ntriangles * sizeof(triangle));
+        d->neighbours = (triangle_neighbours*) malloc(d->ntriangles * sizeof(triangle_neighbours));
+        d->circles = (circle*) malloc(d->ntriangles * sizeof(circle));
+        d->n_point_triangles = (int*) calloc(d->npoints, sizeof(int));
+        d->point_triangles = (int**) malloc(d->npoints * sizeof(int*));
+        d->flags = (int*) calloc(d->ntriangles, sizeof(int));
     }
 
     if (nn_verbose)
@@ -215,7 +218,9 @@ static void tio2delaunay(struct triangulateio* tio_out, delaunay* d)
     if (d->ntriangles > 0) {
         for (i = 0; i < d->npoints; ++i) {
             if (d->n_point_triangles[i] > 0)
-                d->point_triangles[i] = malloc(d->n_point_triangles[i] * sizeof(int));
+
+                // tony: added type cast for nvcc compiler
+                d->point_triangles[i] = (int*) malloc(d->n_point_triangles[i] * sizeof(int));
             else
                 d->point_triangles[i] = NULL;
             d->n_point_triangles[i] = 0;
@@ -234,7 +239,9 @@ static void tio2delaunay(struct triangulateio* tio_out, delaunay* d)
 
     if (tio_out->edgelist != NULL) {
         d->nedges = tio_out->numberofedges;
-        d->edges = malloc(d->nedges * 2 * sizeof(int));
+
+        // tony: added type cast for nvcc compiler
+        d->edges = (int*) malloc(d->nedges * 2 * sizeof(int));
         memcpy(d->edges, tio_out->edgelist, d->nedges * 2 * sizeof(int));
     }
 }
@@ -266,7 +273,8 @@ delaunay* delaunay_build(int np, point points[], int ns, int segments[], int nh,
         return NULL;
     }
 
-    tio_in.pointlist = malloc(np * 2 * sizeof(double));
+    // tony: added type cast for nvcc compiler
+    tio_in.pointlist = (double*) malloc(np * 2 * sizeof(double));
     tio_in.numberofpoints = np;
     for (i = 0, j = 0; i < np; ++i) {
         tio_in.pointlist[j++] = points[i].x;
@@ -274,13 +282,15 @@ delaunay* delaunay_build(int np, point points[], int ns, int segments[], int nh,
     }
 
     if (ns > 0) {
-        tio_in.segmentlist = malloc(ns * 2 * sizeof(int));
+        // tony: added type cast for nvcc compiler
+        tio_in.segmentlist = (int*) malloc(ns * 2 * sizeof(int));
         tio_in.numberofsegments = ns;
         memcpy(tio_in.segmentlist, segments, ns * 2 * sizeof(int));
     }
 
     if (nh > 0) {
-        tio_in.holelist = malloc(nh * 2 * sizeof(double));
+        // tony: added type cast for nvcc compiler
+        tio_in.holelist = (double*) malloc(nh * 2 * sizeof(double));
         tio_in.numberofholes = nh;
         memcpy(tio_in.holelist, holes, nh * 2 * sizeof(double));
     }
@@ -400,7 +410,9 @@ static void delaunay_addflag(delaunay* d, int i)
 {
     if (d->nflags == d->nflagsallocated) {
         d->nflagsallocated += N_FLAGS_INC;
-        d->flagids = realloc(d->flagids, d->nflagsallocated * sizeof(int));
+
+        // tony: added type cast for nvcc compiler
+        d->flagids = (int*) realloc(d->flagids, d->nflagsallocated * sizeof(int));
     }
     d->flagids[d->nflags] = i;
     d->nflags++;
@@ -434,7 +446,7 @@ static void delaunay_resetflags(delaunay* d)
  * search algorithms. It not 100% clear though whether this will lead to a
  * substantial speed gains because of the check on convex hall involved.
  */
-void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
+__device__ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
 {
     /*
      * This flag was introduced as a hack to handle some degenerate cases. It 
