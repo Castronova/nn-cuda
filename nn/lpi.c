@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include "nan.h"
 #include "delaunay.h"
-#include "nn.h"
+#include "nn.cuh"
 #include "nn_internal.h"
 
 typedef struct {

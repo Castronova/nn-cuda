@@ -34,7 +34,7 @@
 #include "config.h"
 #include "delaunay.h"
 #include "nan.h"
-#include "nn.h"
+#include "nn.cuh"
 #include "nn_internal.h"
 
 #define BUFSIZE 1024

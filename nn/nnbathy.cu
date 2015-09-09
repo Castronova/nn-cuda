@@ -34,7 +34,7 @@
 #include "config.h"
 #include "nan.h"
 #include "minell.h"
-#include "nn.h"
+#include "nn.cuh"
 #if defined(NN_SERIAL)
 #include "preader.h"
 #endif
@@ -141,7 +141,7 @@ static void usage()
     exit(0);
 }
 
-static void quit(char* format, ...)
+static void quit(char const* format, ...)
 {
     va_list args;
 
@@ -155,7 +155,7 @@ static void quit(char* format, ...)
     exit(1);
 }
 
-static double str2double(char* token, char* option)
+static double str2double(char const* token, char const* option)
 {
     char* end = NULL;
     double value = NaN;
@@ -174,7 +174,10 @@ static double str2double(char* token, char* option)
 
 static specs* specs_create(void)
 {
-    specs* s = malloc(sizeof(specs));
+//    specs* s = malloc(sizeof(specs));
+    // tony: this is necessary because of nvcc "C" compiling
+    specs* s;
+    s = (specs*) malloc(sizeof(specs));
 
     s->generate_points = 0;
     s->thin = 0;
@@ -501,7 +504,7 @@ int main(int argc, char* argv[])
     if (s->generate_points) {
         /*
          * points_getrange() only writes the proper values to those arguments
-         * which do not point to NaNs 
+         * which do not point to NaNs
          */
         points_getrange(nin, pin, s->zoom, &s->xmin, &s->xmax, &s->ymin, &s->ymax);
         points_generate(s->xmin, s->xmax, s->ymin, s->ymax, s->nx, s->ny, &nout, &pout);

@@ -32,7 +32,7 @@
  *                 For non-Sibsonian NN interpolation this code uses Eq.(40)
  *                 from Sukumar, N., Moran, B., Semenov, A. Yu, and
  *                 Belikov V. V. Natural neighbour Galerkin methods.
- *                 Int. J. Numer. Meth. Engng 2001, v.50: 1­27.
+ *                 Int. J. Numer. Meth. Engng 2001, v.50: 1ï¿½27.
  *
  *
  * Revisions:      01/04/2003 PS: modified nnpi_triangle_process(): for
@@ -71,7 +71,7 @@
 #include "hash.h"
 #include "istack.h"
 #include "delaunay.h"
-#include "nn.h"
+#include "nn.cuh"
 #include "nn_internal.h"
 
 struct nnpi {

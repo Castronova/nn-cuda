@@ -20,7 +20,7 @@
 #if !defined(_DELAUNAY_H)
 #define _DELAUNAY_H
 
-#include "nn.h"
+#include "nn.cuh"
 
 typedef struct {
     int vids[3];

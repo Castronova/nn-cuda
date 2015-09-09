@@ -31,10 +31,24 @@ struct minell;
 typedef struct minell minell;
 #endif
 
+
+// The ifdef checks are necessary to prevent name mangling between C and C++ (CUDA)
+#ifdef __cplusplus
+    extern "C" {
+
+        /* Note that minell_build() shuffles the input point array */
+        minell* minell_build(int n, point p[]);
+        void minell_destroy(minell* me);
+        void minell_scalepoints(minell* me, int n, point p[]);
+        void minell_rescalepoints(minell* me, int n, point p[]);
+};
+#else
 /* Note that minell_build() shuffles the input point array */
 minell* minell_build(int n, point p[]);
 void minell_destroy(minell* me);
 void minell_scalepoints(minell* me, int n, point p[]);
 void minell_rescalepoints(minell* me, int n, point p[]);
+#endif
+
 
 #endif

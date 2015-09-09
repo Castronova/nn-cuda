@@ -40,6 +40,62 @@ struct delaunay;
 typedef struct delaunay delaunay;
 #endif
 
+
+// The ifdef checks are necessary to prevent name mangling between C and C++ (CUDA)
+#ifdef __cplusplus
+    extern "C" {
+
+    void points_read(char* fname, int dim, int* n, point** points);
+    delaunay* delaunay_build(int np, point points[], int ns, int segments[], int nh, double holes[]);
+    void delaunay_destroy(delaunay* d);
+    void points_thingrid(int* n, point** p, int nx, int ny);
+    void points_thinlin(int* n, point** p, double rmax);
+    void points_getrange(int n, point points[], double zoom, double* xmin, double* xmax, double* ymin, double* ymax);
+    void points_generate(double xmin, double xmax, double ymin, double ymax, int nx, int ny, int* nout, point** pout);
+    void points_read(char* fname, int dim, int* n, point** points);
+    double points_scaletosquare(int n, point* points);
+    void points_scale(int n, point* points, double k);
+
+    struct lpi;
+    typedef struct lpi lpi;
+
+    lpi* lpi_build(delaunay* d);
+    void lpi_destroy(lpi* l);
+    void lpi_interpolate_point(lpi* l, point* p);
+    void lpi_interpolate_points(int nin, point pin[], int nout, point pout[]);
+
+    struct nnpi;
+    typedef struct nnpi nnpi;
+
+    nnpi* nnpi_create(delaunay* d);
+    void nnpi_destroy(nnpi* nn);
+    void nnpi_interpolate_point(nnpi* nn, point* p);
+    void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point pout[]);
+    void nnpi_setwmin(nnpi* nn, double wmin);
+
+    struct nnhpi;
+    typedef struct nnhpi nnhpi;
+
+    nnhpi* nnhpi_create(delaunay* d, int size);
+    void nnhpi_destroy(nnhpi* nn);
+    void nnhpi_interpolate(nnhpi* nn, point* p);
+    void nnhpi_modify_data(nnhpi* nn, point* p);
+    void nnhpi_setwmin(nnhpi* nn, double wmin);
+
+    struct nnai;
+    typedef struct nnai nnai;
+
+    nnai* nnai_build(delaunay* d, int n, double* x, double* y);
+    void nnai_destroy(nnai* nn);
+    void nnai_interpolate(nnai* nn, double* zin, double* zout);
+    void nnai_setwmin(nnai* nn, double wmin);
+    extern int nn_verbose;
+    extern NN_RULE nn_rule;
+    extern char* nn_version;
+    extern int nn_test_vertice;
+    };
+#else
+
 /** Builds Delaunay triangulation of the given array of points.
  *
  * @param np Number of points
@@ -346,5 +402,7 @@ extern char* nn_version;
  * debugging purposes).
  */
 extern int nn_test_vertice;
+#endif
+
 
 #endif                          /* _NN_H */
