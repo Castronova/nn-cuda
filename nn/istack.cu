@@ -58,12 +58,31 @@ __device__ int istack_contains(istack* s, int v)
     return 0;
 }
 
+// tony: realloc hack
+__device__ int* cudaIntRealloc(int oldsize, int newsize, int* old)
+{
+    int* newT = (int*) malloc (newsize*sizeof(int));
+
+    int i;
+
+    for(i=0; i<oldsize; i++)
+    {
+        newT[i] = old[i];
+    }
+
+    free(old);
+    return newT;
+}
+
 __device__ void istack_push(istack* s, int v)
 {
     if (s->n == s->nallocated) {
+        // tony: realloc hack
+        s->v = cudaIntRealloc(s->nallocated, ((s->nallocated * 2) * sizeof(int)), s->v );
         s->nallocated *= 2;
         // tony: added type cast for nvcc compiler
-        s->v = (int*) realloc(s->v, s->nallocated * sizeof(int));
+//        s->v = (int*) realloc(s->v, s->nallocated * sizeof(int));
+
     }
 
     s->v[s->n] = v;

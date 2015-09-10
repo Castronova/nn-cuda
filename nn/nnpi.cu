@@ -78,6 +78,7 @@
 #include <curand_kernel.h>
 #include "time.h"
 
+
 struct nnpi {
     delaunay* d;
     double wmin;
@@ -123,6 +124,108 @@ __device__ double cudaRand( )
 //    globalState[ind] = localState;
 //    return random;
 }
+
+__device__ int* cudaIntRealloc(int oldsize, int newsize, int* old)
+{
+    int* newT = (int*) malloc (newsize*sizeof(int));
+
+    int i;
+
+    for(i=0; i<oldsize; i++)
+    {
+        newT[i] = old[i];
+    }
+
+    free(old);
+    return newT;
+}
+
+__device__ double* cudaDoubleRealloc(int oldsize, int newsize, double* old)
+{
+    double* newT = (double*) malloc (newsize*sizeof(double));
+
+    int i;
+
+    for(i=0; i<oldsize; i++)
+    {
+        newT[i] = old[i];
+    }
+
+    free(old);
+    return newT;
+}
+
+__device__ void* cuda_realloc(size_t oldsize, size_t newsize, void* ptr)
+{
+    int minsize;
+    void *newptr;
+
+    // Allocate new block, returning NULL if not possible.
+
+    newptr = malloc (newsize);
+    if (newptr == NULL) return NULL;
+
+    // Don't copy/free original block if it was NULL.
+
+    if (ptr != NULL) {
+        // Get size to copy - mm_getsize must give you the size of the current block.
+        // But, if new size is smaller, only copy that much. Many implementations
+        // actually reserve the 16 bytes in front of the memory to store this info, e.g.,
+        // +--------+--------------------------------+
+        // | Header | Your data                      |
+        // +--------+--------------------------------+
+        //           ^
+        //           +--- this is your pointer.
+        // <- This is the memory actually allocated ->
+
+//        minsize = mm_getsize (ptr);
+        if (newsize < oldsize)
+            oldsize = newsize;
+
+        // Copy the memory, free the old block and return the new block.
+        memcpy (newptr, ptr, oldsize);
+        free (ptr);
+    }
+
+    return newptr;
+}
+
+/*
+void *mm_realloc (void *ptr, size_t size) {
+    int minsize;
+    void *newptr;
+
+    // Allocate new block, returning NULL if not possible.
+
+    newptr = malloc (size);
+    if (newptr == NULL) return NULL;
+
+    // Don't copy/free original block if it was NULL.
+
+    if (ptr != NULL) {
+        // Get size to copy - mm_getsize must give you the size of the current block.
+        // But, if new size is smaller, only copy that much. Many implementations
+        // actually reserve the 16 bytes in front of the memory to store this info, e.g.,
+        // +--------+--------------------------------+
+        // | Header | Your data                      |
+        // +--------+--------------------------------+
+        //           ^
+        //           +--- this is your pointer.
+        // <- This is the memory actually allocated ->
+
+        minsize = mm_getsize (ptr);
+        if (size < minsize)
+            minsize = size;
+
+        // Copy the memory, free the old block and return the new block.
+
+        memcpy (newptr, ptr, minsize);
+        free (ptr)
+    }
+
+    return newptr;
+}
+*/
 
 __device__ void cuda_nn_quit(char const* format)
 {
@@ -214,10 +317,13 @@ __device__ static void nnpi_add_weight(nnpi* nn, int vertex, double w)
          * get more memory if necessary 
          */
         if (nn->nvertices == nn->nallocated) {
-            // tony: (int*)this is necessary because of nvcc "C" compiling
-            nn->vertices = (int*) realloc(nn->vertices, (nn->nallocated + NINC) * sizeof(int));
-            nn->weights = (double*) realloc(nn->weights, (nn->nallocated + NINC) * sizeof(double));
-            nn->nallocated += NINC;
+            // tony: NEED TO PRINT HERE!
+//            cuPrintf("Need more memory! realloc not defined in cuda C.");
+
+//            // tony: (int*)this is necessary because of nvcc "C" compiling
+//            nn->vertices = (int*) realloc(nn->vertices, (nn->nallocated + NINC) * sizeof(int));
+//            nn->weights = (double*) realloc(nn->weights, (nn->nallocated + NINC) * sizeof(double));
+//            nn->nallocated += NINC;
         }
 
         /*
@@ -370,7 +476,7 @@ __device__ static void nnpi_triangle_process(nnpi* nn, point* p, int i)
     }
 }
 
-static int compare_int(const void* p1, const void* p2)
+__device__ static int compare_int(const void* p1, const void* p2)
 {
     int* v1 = (int*) p1;
     int* v2 = (int*) p2;
@@ -642,6 +748,7 @@ __device__ void nnpi_calculate_weights(nnpi* nn, point* p)
             nn->weights[i] /= 2.0;
 
     for (i = 0; i < nvertices; ++i)
+        //vertices[i] = (int*) malloc(10 * sizeof(int));
         nnpi_add_weight(nn, vertices[i], weights[i] / 2.0);
 
     if (nvertices > 0) {

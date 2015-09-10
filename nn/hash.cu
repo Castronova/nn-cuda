@@ -308,13 +308,42 @@ __device__ static unsigned int strhash(void* key)
 __device__ static void* strcp(void* key)
 {
     // tony: (const char*)
-    return strdup((const char*) key);
+//    return strdup((const char*) key);
+
+    // tony: implementation of strdup b/c it doesnt exist in cuda C
+    const char *s = (const char *)key;
+    char *d = malloc (strlen (s) + 1);   // Space for length plus nul
+    if (d == NULL) return NULL;          // No memory
+    strcpy (d,s);                        // Copy the characters
+    return d;                            // Return the new string
+
 }
 
 __device__ static int streq(void* key1, void* key2)
 {
     // tony: (const char*)
-    return !strcmp((const char*) key1, (const char*) key2);
+    //return !strcmp((const char*) key1, (const char*) key2);
+
+    // tony: implementation of strcmp b/c it doesn't exist in cuda C
+    const char* s1 = (const char*)key1;
+    const char* s2 = (const char*)key2;
+
+    const unsigned char *p1 = (const unsigned char *)s1;
+    const unsigned char *p2 = (const unsigned char *)s2;
+
+    while (*p1 != '\0') {
+        if (*p2 == '\0') return  1;
+        if (*p2 > *p1)   return -1;
+        if (*p1 > *p2)   return  1;
+
+        p1++;
+        p2++;
+    }
+
+    if (*p2 != '\0') return -1;
+
+    return 0;
+//    }
 }
 
 /* functions for for double keys */

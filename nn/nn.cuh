@@ -86,7 +86,7 @@ typedef struct delaunay delaunay;
     typedef struct nnai nnai;
 
     nnai* nnai_build(delaunay* d, int n, double* x, double* y);
-    void nnai_destroy(nnai* nn);
+    __device__ void nnai_destroy(nnai* nn);
     void nnai_interpolate(nnai* nn, double* zin, double* zout);
     void nnai_setwmin(nnai* nn, double wmin);
     extern int nn_verbose;

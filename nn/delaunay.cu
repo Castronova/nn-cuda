@@ -330,7 +330,7 @@ delaunay* delaunay_build(int np, point points[], int ns, int segments[], int nh,
  *
  * @param d Structure to be destroyed
  */
-void delaunay_destroy(delaunay* d)
+__device__ void delaunay_destroy(delaunay* d)
 {
     if (d == NULL)
         return;
@@ -406,13 +406,32 @@ __device__ int delaunay_xytoi(delaunay* d, point* p, int id)
     return id;
 }
 
+// tony: realloc hack
+__device__ int* cudaIntRealloc(int oldsize, int newsize, int* old)
+{
+    int* newT = (int*) malloc (newsize*sizeof(int));
+
+    int i;
+
+    for(i=0; i<oldsize; i++)
+    {
+        newT[i] = old[i];
+    }
+
+    free(old);
+    return newT;
+}
+
 __device__ static void delaunay_addflag(delaunay* d, int i)
 {
     if (d->nflags == d->nflagsallocated) {
+
+        // tony: realloc hack
+        d->flagids = cudaIntRealloc(d->nflagsallocated, (d->nflagsallocated+N_FLAGS_INC)*sizeof(int),d->flagids);
         d->nflagsallocated += N_FLAGS_INC;
 
         // tony: added type cast for nvcc compiler
-        d->flagids = (int*) realloc(d->flagids, d->nflagsallocated * sizeof(int));
+//        d->flagids = (int*) realloc(d->flagids, d->nflagsallocated * sizeof(int));
     }
     d->flagids[d->nflags] = i;
     d->nflags++;
