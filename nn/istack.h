@@ -33,12 +33,12 @@ typedef struct istack istack;
             int* v;
         };
 
-        istack* istack_create(void);
-        void istack_destroy(istack* s);
-        void istack_push(istack* s, int v);
-        int istack_pop(istack* s);
-        int istack_contains(istack* s, int v);
-        void istack_reset(istack* s);
+        __device__ istack* istack_create(void);
+        __device__ void istack_destroy(istack* s);
+        __device__ void istack_push(istack* s, int v);
+        __device__ int istack_pop(istack* s);
+        __device__ int istack_contains(istack* s, int v);
+        __device__ void istack_reset(istack* s);
     };
 #else
 

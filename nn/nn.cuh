@@ -94,6 +94,7 @@ typedef struct delaunay delaunay;
     extern char* nn_version;
     extern int nn_test_vertice;
 
+    __device__ void cuda_nn_quit(char const* format);
 //    __global__ void cuda_nn_interpolate(nnpi *dev_nn, point *dev_pout, int nout);
 
     };
@@ -405,6 +406,8 @@ extern char* nn_version;
  * debugging purposes).
  */
 extern int nn_test_vertice;
+
+//__device__ void cuda_nn_quit(char const* format);
 
 //void cuda_nn_interpolate(nnpi *dev_nn, point *dev_pout, int nout);
 #endif

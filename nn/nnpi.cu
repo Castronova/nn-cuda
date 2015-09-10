@@ -103,6 +103,24 @@ struct nnpi {
 __device__ int dev_nn_verbose;
 __device__ int dev_nn_test_vertice;
 
+
+
+__device__ void cuda_nn_quit(char const* format)
+{
+    va_list args;
+
+    fflush(stdout);             /* just in case, to have the exit message
+                                 * last */
+
+//    fprintf(stderr, "  error: libnn: ");
+//    va_start(args, format);
+//    vfprintf(stderr, format, args);
+//    va_end(args);
+
+    exit(1);
+}
+
+
 /* Creates Natural Neighbours point interpolator.
  *
  * @param d Delaunay triangulation
@@ -529,7 +547,7 @@ __device__ static int _nnpi_calculate_weights(nnpi* nn, point* p)
 
         return status;
     } else
-        nn_quit("programming error");
+        cuda_nn_quit("programming error");
 
     return 0;
 }

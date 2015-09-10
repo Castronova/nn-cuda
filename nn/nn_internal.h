@@ -35,7 +35,7 @@
          */
         int circle_build1(circle* c, point* p0, point* p1, point* p2);
         int circle_build2(circle* c, point* p0, point* p1, point* p2);
-        int circle_contains(circle* c, point* p);
+        __device__ int circle_contains(circle* c, point* p);
         void nn_quit(char const* format, ...);
         int str2double(char* token, double* value);
     };
@@ -54,7 +54,7 @@ double* nnpi_get_weights(nnpi* nn);
  */
 int circle_build1(circle* c, point* p0, point* p1, point* p2);
 int circle_build2(circle* c, point* p0, point* p1, point* p2);
-int circle_contains(circle* c, point* p);
+//int circle_contains(circle* c, point* p);
 void nn_quit(char const* format, ...);
 int str2double(char* token, double* value);
 
