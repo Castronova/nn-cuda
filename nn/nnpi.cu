@@ -74,6 +74,9 @@
 #include "nn.cuh"
 #include "nn_internal.h"
 #include "cuda_runtime.h"
+#include "curand.h"
+#include <curand_kernel.h>
+#include "time.h"
 
 struct nnpi {
     delaunay* d;
@@ -99,11 +102,27 @@ struct nnpi {
 #define EPS_WMIN 1.0e-6
 #define HT_SIZE 100
 #define EPS_SAME 1.0e-8
+//#define RANDOM (double) rand() / ((double) RAND_MAX + 1.0)
+#define RANDOM (double) cudaRand() / ((double) RAND_MAX + 1.0)
 
 __device__ int dev_nn_verbose;
 __device__ int dev_nn_test_vertice;
+__device__ NN_RULE dev_nn_rule;
 
 
+__device__ double cudaRand( )
+{
+    curandState state;
+    curand_init((unsigned long long)clock(), 0, 0, &state);
+    return curand_uniform_double(&state);
+
+//    int ind = threadIdx.x;
+//    curandState localState = globalState[ind];
+//    curand();
+//    float random = curand_uniform( &localState );
+//    globalState[ind] = localState;
+//    return random;
+}
 
 __device__ void cuda_nn_quit(char const* format)
 {
@@ -526,7 +545,7 @@ __device__ static int _nnpi_calculate_weights(nnpi* nn, point* p)
      * processing triplets of natural neighbours by moving clockwise or
      * counterclockwise around the interpolated point.
      */
-    if (nn_rule == SIBSON) {
+    if (dev_nn_rule == SIBSON) {
         for (i = 0; i < nn->ncircles; ++i)
             nnpi_triangle_process(nn, p, tids[i]);
         if (nn->bad != NULL) {
@@ -538,7 +557,7 @@ __device__ static int _nnpi_calculate_weights(nnpi* nn, point* p)
             }
         }
         return 1;
-    } else if (nn_rule == NON_SIBSONIAN) {
+    } else if (dev_nn_rule == NON_SIBSONIAN) {
         int nneigh = 0;
         int* nids = NULL;
         int status;
@@ -566,8 +585,6 @@ __device__ static void nnpi_normalize_weights(nnpi* nn)
     for (i = 0; i < n; ++i)
         nn->weights[i] /= sum;
 }
-
-#define RANDOM (double) rand() / ((double) RAND_MAX + 1.0)
 
 __device__ void nnpi_calculate_weights(nnpi* nn, point* p)
 {
@@ -781,6 +798,7 @@ void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point 
 
     cudaMemcpyFromSymbol(&nn_verbose, "dev_nn_verbose", sizeof(int), 0, cudaMemcpyHostToDevice);
     cudaMemcpyFromSymbol(&nn_test_vertice, "dev_nn_test_vertice", sizeof(int), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyFromSymbol(&dev_nn_rule, "dev_nn_rule", sizeof(NN_RULE), nn_rule, cudaMemcpyHostToDevice);
 
 
     // tony: call cuda_nn_interpolate. todo, split into parallel blocks

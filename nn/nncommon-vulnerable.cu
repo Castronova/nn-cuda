@@ -31,6 +31,9 @@
 
 #define MULT 1.0e+7
 
+//__device__ double CUDA_NaN = 0.0 / 0.0;
+
+
 int circle_build1(circle* c, point* p1, point* p2, point* p3)
 {
     double x2 = p2->x - p1->x;
@@ -60,6 +63,7 @@ int circle_build1(circle* c, point* p1, point* p2, point* p3)
 
 __device__ int circle_build2(circle* c, point* p1, point* p2, point* p3)
 {
+    const double CUDA_NaN = 0.0 / 0.0;
     double x2 = p2->x - p1->x;
     double y2 = p2->y - p1->y;
     double x3 = p3->x - p1->x;
@@ -69,9 +73,9 @@ __device__ int circle_build2(circle* c, point* p1, point* p2, point* p3)
     double frac;
 
     if (denom == 0) {
-        c->x = NaN;
-        c->y = NaN;
-        c->r = NaN;
+        c->x = CUDA_NaN;
+        c->y = CUDA_NaN;
+        c->r = CUDA_NaN;
         return 0;
     }
 
@@ -80,8 +84,8 @@ __device__ int circle_build2(circle* c, point* p1, point* p2, point* p3)
     c->y = (y3 - frac * x3) / 2.0;
     c->r = hypot(c->x, c->y);
     if (c->r > (fabs(x2) + fabs(x3) + fabs(y2) + fabs(y3)) * MULT) {
-        c->x = NaN;
-        c->y = NaN;
+        c->x = CUDA_NaN;
+        c->y = CUDA_NaN;
     } else {
         c->x += p1->x;
         c->y += p1->y;

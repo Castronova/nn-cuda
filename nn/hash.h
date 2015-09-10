@@ -26,10 +26,10 @@
         typedef int (*ht_keyeq) (void*, void*);
         typedef unsigned int (*ht_key2hash) (void*);
         __device__ hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash);
-        hashtable* ht_create_d1(int size);      /* double[1] */
-        hashtable* ht_create_d2(int size);      /* double[2] */
-        hashtable* ht_create_str(int size);     /* char* */
-        hashtable* ht_create_i1(int size);      /* int[1] */
+        __device__ hashtable* ht_create_d1(int size);      /* double[1] */
+        __device__ hashtable* ht_create_d2(int size);      /* double[2] */
+        __device__ hashtable* ht_create_str(int size);     /* char* */
+        __device__ hashtable* ht_create_i1(int size);      /* int[1] */
         __device__ hashtable* ht_create_i2(int size);      /* int[2] */
         __device__ void ht_destroy(hashtable* table);
         __device__ void* ht_insert(hashtable* table, void* key, void* data);

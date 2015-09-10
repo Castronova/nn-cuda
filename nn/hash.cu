@@ -290,7 +290,7 @@ __device__ void ht_process(hashtable* table, void (*func) (void*))
  * functions for for string keys 
  */
 
-static unsigned int strhash(void* key)
+__device__ static unsigned int strhash(void* key)
 {
     // tony: (char*)
     char* str = (char *) key;
@@ -305,13 +305,13 @@ static unsigned int strhash(void* key)
     return hashvalue;
 }
 
-static void* strcp(void* key)
+__device__ static void* strcp(void* key)
 {
     // tony: (const char*)
     return strdup((const char*) key);
 }
 
-static int streq(void* key1, void* key2)
+__device__ static int streq(void* key1, void* key2)
 {
     // tony: (const char*)
     return !strcmp((const char*) key1, (const char*) key2);
@@ -319,7 +319,7 @@ static int streq(void* key1, void* key2)
 
 /* functions for for double keys */
 
-static unsigned int d1hash(void* key)
+__device__ static unsigned int d1hash(void* key)
 {
     // tony: (unsigned int*)
     unsigned int* v = (unsigned int*) key;
@@ -331,7 +331,7 @@ static unsigned int d1hash(void* key)
 #endif
 }
 
-static void* d1cp(void* key)
+__device__ static void* d1cp(void* key)
 {
     // tony: (double*)
     double* newkey = (double *) malloc(sizeof(double));
@@ -341,7 +341,7 @@ static void* d1cp(void* key)
     return newkey;
 }
 
-static int d1eq(void* key1, void* key2)
+__device__ static int d1eq(void* key1, void* key2)
 {
     return *(double*) key1 == *(double*) key2;
 }
@@ -350,7 +350,7 @@ static int d1eq(void* key1, void* key2)
  * functions for for double[2] keys 
  */
 
-static unsigned int d2hash(void* key)
+__device__ static unsigned int d2hash(void* key)
 {
     // tony: (unsigned int*)
     unsigned int* v = (unsigned int*) key;
@@ -366,7 +366,7 @@ static unsigned int d2hash(void* key)
 #endif
 }
 
-static void* d2cp(void* key)
+__device__ static void* d2cp(void* key)
 {
     // tony: (double*)
     double* newkey = (double*) malloc(sizeof(double) * 2);
@@ -377,7 +377,7 @@ static void* d2cp(void* key)
     return newkey;
 }
 
-static int d2eq(void* key1, void* key2)
+__device__ static int d2eq(void* key1, void* key2)
 {
     return (((double*) key1)[0] == ((double*) key2)[0]) && (((double*) key1)[1] == ((double*) key2)[1]);
 }
@@ -386,12 +386,12 @@ static int d2eq(void* key1, void* key2)
  * functions for for int[1] keys 
  */
 
-static unsigned int i1hash(void* key)
+__device__ static unsigned int i1hash(void* key)
 {
     return ((unsigned int*) key)[0];
 }
 
-static void* i1cp(void* key)
+__device__ static void* i1cp(void* key)
 {
     //tony: (int*)
     int* newkey = (int*) malloc(sizeof(int));
@@ -401,7 +401,7 @@ static void* i1cp(void* key)
     return newkey;
 }
 
-static int i1eq(void* key1, void* key2)
+__device__ static int i1eq(void* key1, void* key2)
 {
     return (((int*) key1)[0] == ((int*) key2)[0]);
 }
@@ -410,7 +410,7 @@ static int i1eq(void* key1, void* key2)
  * functions for for int[2] keys 
  */
 
-static unsigned int i2hash(void* key)
+__device__ static unsigned int i2hash(void* key)
 {
 #if BYTE_PER_INT >= 4
     // tony: (unsigned int*)
@@ -422,7 +422,7 @@ static unsigned int i2hash(void* key)
 #endif
 }
 
-static void* i2cp(void* key)
+__device__ static void* i2cp(void* key)
 {
     // tony (int*)
     int* newkey = (int*) malloc(sizeof(int) * 2);
@@ -433,29 +433,29 @@ static void* i2cp(void* key)
     return newkey;
 }
 
-static int i2eq(void* key1, void* key2)
+__device__  static int i2eq(void* key1, void* key2)
 {
     return (((int*) key1)[0] == ((int*) key2)[0]) && (((int*) key1)[1] == ((int*) key2)[1]);
 }
 
-hashtable* ht_create_d1(int size)
+__device__ hashtable* ht_create_d1(int size)
 {
     assert(sizeof(double) == INT_PER_DOUBLE * sizeof(int));
     return ht_create(size, d1cp, d1eq, d1hash);
 }
 
-hashtable* ht_create_d2(int size)
+__device__ hashtable* ht_create_d2(int size)
 {
     assert(sizeof(double) == INT_PER_DOUBLE * sizeof(int));
     return ht_create(size, d2cp, d2eq, d2hash);
 }
 
-hashtable* ht_create_str(int size)
+__device__  hashtable* ht_create_str(int size)
 {
     return ht_create(size, strcp, streq, strhash);
 }
 
-hashtable* ht_create_i1(int size)
+__device__ hashtable* ht_create_i1(int size)
 {
     return ht_create(size, i1cp, i1eq, i1hash);
 }
