@@ -50,7 +50,7 @@ struct hashtable {
 
 /* Creates a hashtable of specified size.
  */
-hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash)
+__device__ hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash)
 {
     // tony: (hashtable*)
     hashtable* table = (hashtable*) malloc(sizeof(hashtable));
@@ -124,7 +124,7 @@ __device__ void ht_destroy(hashtable* table)
  * @return Pointer to the old data associated with the key, NULL if the key
  *         wasn't in the table previously
  */
-void* ht_insert(hashtable* table, void* key, void* data)
+__device__ void* ht_insert(hashtable* table, void* key, void* data)
 {
     unsigned int val = table->hash(key) % table->size;
     ht_bucket* bucket;
@@ -196,7 +196,7 @@ void* ht_insert(hashtable* table, void* key, void* data)
  * @param key The key
  * @return The associated data or NULL
  */
-void* ht_find(hashtable* table, void* key)
+__device__ void* ht_find(hashtable* table, void* key)
 {
     unsigned int val = table->hash(key) % table->size;
     ht_bucket* bucket;
@@ -219,7 +219,7 @@ void* ht_find(hashtable* table, void* key)
  * @param key The key
  * @return The associated data or NULL
  */
-void* ht_delete(hashtable* table, void* key)
+__device__ void* ht_delete(hashtable* table, void* key)
 {
     unsigned int val = table->hash(key) % table->size;
     ht_bucket* prev;
@@ -273,7 +273,7 @@ void* ht_delete(hashtable* table, void* key)
  * @param table The hash table
  * @param func The action function
  */
-void ht_process(hashtable* table, void (*func) (void*))
+__device__ void ht_process(hashtable* table, void (*func) (void*))
 {
     int i;
 
@@ -460,13 +460,13 @@ hashtable* ht_create_i1(int size)
     return ht_create(size, i1cp, i1eq, i1hash);
 }
 
-hashtable* ht_create_i2(int size)
+__device__ hashtable* ht_create_i2(int size)
 {
     assert(sizeof(int) == BYTE_PER_INT);
     return ht_create(size, i2cp, i2eq, i2hash);
 }
 
-int ht_getnentries(hashtable* table)
+__device__ int ht_getnentries(hashtable* table)
 {
     return table->n;
 }

@@ -366,7 +366,7 @@ void delaunay_destroy(delaunay* d)
 
 /* Returns whether the point p is on the right side of the vector (p0, p1).
  */
-static int onrightside(point* p, point* p0, point* p1)
+__device__ static int onrightside(point* p, point* p0, point* p1)
 {
     return (p1->x - p->x) * (p0->y - p->y) > (p0->x - p->x) * (p1->y - p->y);
 }
@@ -378,7 +378,7 @@ static int onrightside(point* p, point* p0, point* p1)
  * @param seed Triangle index to start with
  * @return Triangle id if successful, -1 otherwhile
  */
-int delaunay_xytoi(delaunay* d, point* p, int id)
+__device__ int delaunay_xytoi(delaunay* d, point* p, int id)
 {
     triangle* t;
     int i;
@@ -406,7 +406,7 @@ int delaunay_xytoi(delaunay* d, point* p, int id)
     return id;
 }
 
-static void delaunay_addflag(delaunay* d, int i)
+__device__ static void delaunay_addflag(delaunay* d, int i)
 {
     if (d->nflags == d->nflagsallocated) {
         d->nflagsallocated += N_FLAGS_INC;
@@ -418,7 +418,7 @@ static void delaunay_addflag(delaunay* d, int i)
     d->nflags++;
 }
 
-static void delaunay_resetflags(delaunay* d)
+__device__  static void delaunay_resetflags(delaunay* d)
 {
     int i;
 

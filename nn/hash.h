@@ -25,18 +25,18 @@
         typedef void* (*ht_keycp) (void*);
         typedef int (*ht_keyeq) (void*, void*);
         typedef unsigned int (*ht_key2hash) (void*);
-        hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash);
+        __device__ hashtable* ht_create(int size, ht_keycp cp, ht_keyeq eq, ht_key2hash hash);
         hashtable* ht_create_d1(int size);      /* double[1] */
         hashtable* ht_create_d2(int size);      /* double[2] */
         hashtable* ht_create_str(int size);     /* char* */
         hashtable* ht_create_i1(int size);      /* int[1] */
-        hashtable* ht_create_i2(int size);      /* int[2] */
+        __device__ hashtable* ht_create_i2(int size);      /* int[2] */
         __device__ void ht_destroy(hashtable* table);
-        void* ht_insert(hashtable* table, void* key, void* data);
-        void* ht_find(hashtable* table, void* key);
-        void* ht_delete(hashtable* table, void* key);
-        void ht_process(hashtable* table, void (*func) (void*));
-        int ht_getnentries(hashtable* table);
+        __device__ void* ht_insert(hashtable* table, void* key, void* data);
+        __device__ void* ht_find(hashtable* table, void* key);
+        __device__ void* ht_delete(hashtable* table, void* key);
+        __device__ void ht_process(hashtable* table, void (*func) (void*));
+        __device__ int ht_getnentries(hashtable* table);
         int ht_getsize(hashtable* table);
         int ht_getnfilled(hashtable* table);
     };
@@ -80,7 +80,7 @@ hashtable* ht_create_i2(int size);      /* int[2] */
  *
  * @param table Hash table to be destroyed
  */
-__device__ void ht_destroy(hashtable* table);
+void ht_destroy(hashtable* table);
 
 /** Inserts a new entry into the hash table.
  *

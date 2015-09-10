@@ -109,15 +109,17 @@ __device__ void cuda_nn_quit(char const* format)
 {
     va_list args;
 
-    fflush(stdout);             /* just in case, to have the exit message
-                                 * last */
+//    fflush(stdout);             /* just in case, to have the exit message
+//                                 * last */
 
 //    fprintf(stderr, "  error: libnn: ");
 //    va_start(args, format);
 //    vfprintf(stderr, format, args);
 //    va_end(args);
 
-    exit(1);
+    asm("trap;");            // kill kernel with error
+
+//    exit(1);
 }
 
 

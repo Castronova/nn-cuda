@@ -94,7 +94,7 @@ typedef struct delaunay delaunay;
         };
 
         __device__ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
-        int delaunay_xytoi(delaunay* d, point* p, int seed);
+        __device__ int delaunay_xytoi(delaunay* d, point* p, int seed);
     }
 #else
 /** Structure to perform the Delaunay triangulation of a given array of points.
@@ -148,7 +148,7 @@ struct delaunay {
 /*
  * delaunay_build() and delaunay_destroy() belong to "nn.h"
  */
-__device__ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
+void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
 int delaunay_xytoi(delaunay* d, point* p, int seed);
 
 #endif
