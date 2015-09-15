@@ -15,6 +15,8 @@
  *
  *****************************************************************************/
 
+#include "hash.h"
+
 #if !defined(_NN_H)
 #define _NN_H
 
@@ -182,7 +184,26 @@ void lpi_interpolate_points(int nin, point pin[], int nout, point pout[]);
  * designed to take advantage of consequitive interpolations on the same 
  * sets of input and output points -- use `nnhpi' or `nnai' in these cases.
  */
-struct nnpi;
+
+
+struct nnpi {
+    delaunay* d;
+    double wmin;
+    int n;                      /* number of points processed */
+    /*
+     * work variables
+     */
+    int ncircles;
+    int nvertices;
+    int nallocated;
+    int* vertices;              /* vertex indices */
+    double* weights;
+    double dx, dy;              /* vertex perturbation */
+    hashtable* bad;             /* ids of vertices that require a special
+                                 * treatment */
+};
+//
+//struct nnpi;
 typedef struct nnpi nnpi;
 
 /** Creates Natural Neighbours point interpolator.
