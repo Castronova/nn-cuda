@@ -478,6 +478,7 @@ static int _nnpi_calculate_weights(nnpi* nn, point* p)
     int* tids = NULL;
     int i;
 
+    // tony: need to cudaize
     delaunay_circles_find(nn->d, p, &nn->ncircles, &tids);
     if (nn->ncircles == 0)
         return 1;
@@ -492,6 +493,8 @@ static int _nnpi_calculate_weights(nnpi* nn, point* p)
      */
     if (nn_rule == SIBSON) {
         for (i = 0; i < nn->ncircles; ++i)
+
+            // tony: need to cudaize
             nnpi_triangle_process(nn, p, tids[i]);
         if (nn->bad != NULL) {
             int nentries = ht_getnentries(nn->bad);
@@ -546,9 +549,9 @@ void nnpi_calculate_weights(nnpi* nn, point* p)
 
     if (_nnpi_calculate_weights(nn, p)) {
 
-//        nnpi_normalize_weights(nn);
+        nnpi_normalize_weights(nn);
 
-        cuda_nnpi_normalize_weights(nn);
+//        cuda_nnpi_normalize_weights(nn);
 
         return;
     }
@@ -630,48 +633,48 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
 
     nnpi_calculate_weights(nn, p);
 
-    if (nn_verbose) {
-        if (nn_test_vertice == -1) {
-            indexedvalue* ivs = NULL;
-
-            if (nn->nvertices > 0) {
-                ivs = (indexedvalue *) malloc(nn->nvertices * sizeof(indexedvalue));
-
-                for (i = 0; i < nn->nvertices; ++i) {
-                    ivs[i].i = nn->vertices[i];
-                    ivs[i].v = &nn->weights[i];
-                }
-
-                qsort(ivs, nn->nvertices, sizeof(indexedvalue), cmp_iv);
-            }
-
-            if (nn->n == 0)
-                fprintf(stderr, "weights:\n");
-            fprintf(stderr, "  %d: (%.10g, %10g)\n", nn->n, p->x, p->y);
-            fprintf(stderr, "  %4s %15s %15s %15s %15s\n", "id", "x", "y", "z", "w");
-            for (i = 0; i < nn->nvertices; ++i) {
-                int ii = ivs[i].i;
-                point* pp = &d->points[ii];
-
-                fprintf(stderr, "  %5d %15.10g %15.10g %15.10g %15f\n", ii, pp->x, pp->y, pp->z, *ivs[i].v);
-            }
-
-            if (nn->nvertices > 0)
-                free(ivs);
-        } else {
-            double w = 0.0;
-
-            if (nn->n == 0)
-                fprintf(stderr, "weight of vertex %d:\n", nn_test_vertice);
-            for (i = 0; i < nn->nvertices; ++i) {
-                if (nn->vertices[i] == nn_test_vertice) {
-                    w = nn->weights[i];
-                    break;
-                }
-            }
-            fprintf(stderr, "  (%.10g, %.10g): %.7g\n", p->x, p->y, w);
-        }
-    }
+//    if (nn_verbose) {
+//        if (nn_test_vertice == -1) {
+//            indexedvalue* ivs = NULL;
+//
+//            if (nn->nvertices > 0) {
+//                ivs = (indexedvalue *) malloc(nn->nvertices * sizeof(indexedvalue));
+//
+//                for (i = 0; i < nn->nvertices; ++i) {
+//                    ivs[i].i = nn->vertices[i];
+//                    ivs[i].v = &nn->weights[i];
+//                }
+//
+//                qsort(ivs, nn->nvertices, sizeof(indexedvalue), cmp_iv);
+//            }
+//
+//            if (nn->n == 0)
+//                fprintf(stderr, "weights:\n");
+//            fprintf(stderr, "  %d: (%.10g, %10g)\n", nn->n, p->x, p->y);
+//            fprintf(stderr, "  %4s %15s %15s %15s %15s\n", "id", "x", "y", "z", "w");
+//            for (i = 0; i < nn->nvertices; ++i) {
+//                int ii = ivs[i].i;
+//                point* pp = &d->points[ii];
+//
+//                fprintf(stderr, "  %5d %15.10g %15.10g %15.10g %15f\n", ii, pp->x, pp->y, pp->z, *ivs[i].v);
+//            }
+//
+//            if (nn->nvertices > 0)
+//                free(ivs);
+//        } else {
+//            double w = 0.0;
+//
+//            if (nn->n == 0)
+//                fprintf(stderr, "weight of vertex %d:\n", nn_test_vertice);
+//            for (i = 0; i < nn->nvertices; ++i) {
+//                if (nn->vertices[i] == nn_test_vertice) {
+//                    w = nn->weights[i];
+//                    break;
+//                }
+//            }
+//            fprintf(stderr, "  (%.10g, %.10g): %.7g\n", p->x, p->y, w);
+//        }
+//    }
 
     nn->n++;
 
@@ -692,6 +695,8 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
     }
 }
 
+
+
 /* Performs Natural Neighbours interpolation for an array of points.
  *
  * @param nin Number of input points
@@ -702,7 +707,23 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
  */
 void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point pout[])
 {
+    // tony: set the delaunay object in the device!
     delaunay* d = delaunay_build(nin, pin, 0, NULL, 0, NULL);
+
+    // set the circles array in the device
+    // note: d->ntriangles == number of circles
+//    circle circles[d->ntriangles];
+    circle* circles;
+    circles = (circle*) malloc (d->ntriangles+1);
+    for (int c =0; c < d->ntriangles; c++){
+        circles[c] = (circle) d->circles[c];
+    }
+
+//    cuda_set_delaunay(d);
+    cuda_set_circles(circles, d->ntriangles);
+//    cuda_test_get_global_circles(circles, d->ntriangles);
+
+
     nnpi* nn = nnpi_create(d);
     int seed = 0;
     int i;

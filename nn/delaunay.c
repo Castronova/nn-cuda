@@ -38,6 +38,8 @@
 #include "delaunay.h"
 #include "nn.h"
 #include "nn_internal.h"
+#include "cuda_funcs.h"
+#include "time.h"
 
 /*
  * This parameter is used in search of tricircles containing a given point:
@@ -509,10 +511,32 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
             if (tid < 0 || i == nn) {
                 double nt = d->ntriangles;
 
+                clock_t s1, s2, d1, d2;
+                // tony: this is horribly slow!  this could check every triangle!!!
+
+
+                s1 = clock();
                 for (tid = 0; tid < nt; ++tid) {
                     if (circle_contains(&d->circles[tid], p))
                         break;
                 }
+                d1 = clock() - s1;
+
+
+//                s2 = clock();
+//                int tid2 = cuda__get_circle(d, p, nt);
+//                d2 = clock() - s2;
+
+
+//                if (tid != tid2){
+//                    printf("No match found....somethings wrong!");
+//                    exit(1);
+//                }
+
+//                int t1 = d1 * 1000 / CLOCKS_PER_SEC;
+//                int t2 = d2 * 1000 / CLOCKS_PER_SEC;
+//                printf("%d --> %d\n", t1, t2);
+
                 if (tid == nt) {
                     istack_reset(d->t_out);
                     *n = 0;

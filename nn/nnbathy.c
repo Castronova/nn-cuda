@@ -35,6 +35,8 @@
 #include "nan.h"
 #include "minell.h"
 #include "nn.h"
+#include "time.h"
+
 #if defined(NN_SERIAL)
 #include "preader.h"
 #endif
@@ -465,6 +467,11 @@ static void points_write(int n, point* points)
  */
 int main(int argc, char* argv[])
 {
+
+    // start the timer
+    clock_t start = clock(), diff;
+
+
     specs* s = specs_create();
     int nin = 0;
     point* pin = NULL;
@@ -534,6 +541,11 @@ int main(int argc, char* argv[])
     specs_destroy(s);
     free(pin);
     free(pout);
+
+    // end the timer
+    diff = clock() - start;
+    int msec = diff * 1000 / CLOCKS_PER_SEC;
+    printf("Time taken %d seconds %d milliseconds", msec/1000, msec%1000);
 
     return 0;
 }

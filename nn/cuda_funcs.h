@@ -2,6 +2,7 @@
 #define _CUDA_FUNCS_H
 
 #include "nn.h"
+#include "delaunay.h"
 
 //namespace cuda_funcs{
 
@@ -9,12 +10,20 @@
 extern "C" {
 
 void cuda_nnpi_normalize_weights(nnpi *nn);
-
+int cuda__get_circle(delaunay* d, point* p, int nt);
+void cuda_set_delaunay(delaunay* d);
+void check_delaunay();
+void cuda_set_circles(circle* c, int count);
+void cuda_test_get_global_circles(circle* c, int count);
 }
 #else
 
 void cuda_nnpi_normalize_weights(nnpi *nn);
-
+int cuda__get_circle(delaunay* d, point* p, int nt);
+void cuda_set_delaunay(delaunay* d);
+void check_delaunay();
+void cuda_set_circles(circle* c, int count);
+void cuda_test_get_global_circles(circle* c, int count);
 #endif
 
 
