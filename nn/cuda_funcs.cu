@@ -6,434 +6,153 @@
 #include <stdlib.h>
 #include <cuda.h>
 #include <stdbool.h>
+#include "istack.h"
+#include "nn_internal.h"
+#include <iostream>
+#include <stdlib.h>
+
+using namespace std;
+
+static void CheckCudaErrorAux (const char *, unsigned, const char *, cudaError_t);
+#define HANDLE_ERROR(value) CheckCudaErrorAux(__FILE__,__LINE__, #value, value)
+
+#define N_SEARCH_TURNON 20
+#define N_FLAGS_TURNON 1000
+#define N_FLAGS_INC 100
 
 
-struct S {
-    int x;
-    int y;
-    int z;
-    int* k;
-};
-typedef struct S S;
+__global__ void _search_cuda_all(double* ptx, double* pty, int npts, double* cx, double* cy, double* cr, int* fidx, int count){
+//     pts:    2d array of search point coordinates
+//     npts:   size of the pts array (i.e. number of total points)
+//     cx:     circle x coordinates
+//     cy:     circle y coordinates
+//     cz:     circle z coordinates
+//     fidx:   array of circle indices in which the pts intersect
+//     count:  number of circles
 
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    if(tid < npts){
 
-__device__  __constant__ S* d_struct;
+        // grab the next point
+        double px = ptx[tid];
+        double py = pty[tid];
 
-// tony: this needs to be set, see nnpi.c line 708
-__device__ __constant__ delaunay* dev_d;
-__device__ __constant__ int** d_circles;
-__device__ __constant__ double* d_array;
-__device__ __constant__ int s_array[256];
-__device__ __constant__ int d_int;
-//__device__ __constant__ double d_circles_const[5000][3];
+        // loop over all circles to find match
+        int i;
+        for (i = 0; i < count; i++) {
 
-__device__ __constant__ double* cx;
-__device__ __constant__ double* cy;
-__device__ __constant__ double* cr;
-__device__ __constant__ int d_circle_count;
-__device__ __constant__ int d_circle_size;
+            // note: hypot doesn't work in the kernel
+            double dist = (cx[i] - px) * (cx[i] - px) + (cy[i] - py) * (cy[i] - py);
+            double radi = cr[i] * cr[i];
 
-
-bool ERROR_CHECK(cudaError_t Status) {
-    if(Status != cudaSuccess)
-    {
-        printf(cudaGetErrorString(Status));
-        return false;
-    }
-    return true;
-}
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-
-__global__ void _cuda_nnpi_normalize_weights(nnpi* nn) {
-
-//    int j = blockIdx.x * blockDim.x + threadIdx.x;
-//    nnpi* newnn = nn[j];
-
-    int n = nn->nvertices;
-    double sum = 0.0;
-    int i;
-
-    for (i = 0; i < n; ++i)
-        sum += nn->weights[i];
-
-    for (i = 0; i < n; ++i)
-        nn->weights[i] /= sum;
-}
-
-
-__global__ void _cuda_find_containing_circle(double px, double py, int* fidx, int count){
-
-    // raw c code
-//    for (tid = 0; tid < nt; ++tid) {
-//        if (circle_contains(&d->circles[tid], p))
-//            break;
-//    }
-
-
-
-//    int idx = blockDim.x*blockIdx.x + threadIdx.x;
-    int idx = threadIdx.x;
-//    printf("%d ", idx);
-
-    if(idx < count){
-        if (hypot(cx[idx] - px, cy[idx] - py) <= cr[idx]){
-//            printf("FOUND: %d\n", idx);
-            *fidx = idx;
+            // exit loop early if a match is found
+            if (dist <= radi) {
+                fidx[tid] = i;
+                break;
+            }
         }
+
+        // increment thread id
+        tid += blockDim.x * gridDim.x;
     }
-//    __syncthreads();
-//
-//    if (*fidx == -999){
-//        *fidx = 10;
-//    }
 }
 
-__host__ void cuda_nnpi_normalize_weights(nnpi* nn) {
-
-    // tony: adding some cuda stuff
-
-    nnpi *dev_nn;
-    cudaMalloc( (void **) &dev_nn, sizeof(nnpi));
-    cudaMemcpy(dev_nn, nn, sizeof(nnpi), cudaMemcpyHostToDevice);
 
 
-    // tony: call cuda_nn_interpolate. todo, split into parallel blocks
-    _cuda_nnpi_normalize_weights<<<1,1>>>(dev_nn);
+int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir){
 
-    cudaMemcpy(nn, dev_nn, sizeof(nnpi), cudaMemcpyDeviceToHost);
-
-    // tony: free the allocated memory
-    cudaFree(dev_nn);
-
-}
-
-__host__ int cuda__get_circle(delaunay* d, point* p, int nt){
-
-    cudaError_t Status = cudaSuccess;
-
+    cudaGetDevice(0);
+    cudaDeviceReset();
 
     int blockSize;   // The launch configurator returned block size
     int minGridSize; // The minimum grid size needed to achieve the
+
     // maximum occupancy for a full device launch
     int gridSize;    // The actual grid size needed, based on input size
-
-    cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize,
-                                        _cuda_find_containing_circle, 0, nt);
-
-
+    cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, _search_cuda_all, 0, npts);
     // Round up according to array size
-    gridSize = (nt + blockSize - 1) / blockSize;
+    gridSize = (npts + blockSize - 1) / blockSize;
 
-//    MyKernel<<< gridSize, blockSize >>>(array, arrayCount);
+    int* d_idx;
+    double *d_cx, *d_cy, *d_cr, *d_ptx, *d_pty;
+//    int idx [n_cir];
 
-
-//    point* dev_p;
-    int* dev_idx;
-    int idx = -999;  // initial condition.  If -999 is returned then I know that a match was not found
-
-
-//    double *circlex;
-//    circlex = (double *) malloc(sizeof(double) * nt);
-//
-//    for (int i = 0; i < nt; i++) {
-//        circlex[i] = p->x;
-//    }
-
-    //398
-    double *hcx, *hcy, *hcr;
-    Status = cudaMemcpyFromSymbol(&hcx, cx, sizeof(double), 0, cudaMemcpyDeviceToHost);
-    Status = cudaMemcpyFromSymbol(&hcy, cy, sizeof(double), 0, cudaMemcpyDeviceToHost);
-    Status = cudaMemcpyFromSymbol(&hcr, cr, sizeof(double), 0, cudaMemcpyDeviceToHost);
-
-    double val = hypot(hcx[398] - p->x, hcy[398] - p->y);
-    printf("val %3.1f\n", val);
-
-    // hypot(c->x - p->x, c->y - p->y) <= c->r)
-
-    // tony: I do not know what p->x and p->y are switched
-    // (lldb) p p->x       (double) $5 = 593424.65000000002
-    // (lldb) p p->y       (double) $6 = 5676316.9800000004
-    // (lldb) p hcx[398]   (double) $10 = 5677316.4925473807
-    // (lldb) p hcy[398]   (double) $11 = 593633.92188352742
-    // (lldb) p hcr[398]   (double) $12 = 1733.2493017905658
-
-    // (lldb) p p->x       (double) $400 = 593424.65000000002
-    // (lldb) p p->y       (double) $402 = 5676316.9800000004
-    // (lldb) p c->x       (double) $399 = 593633.92188352742
-    // (lldb) p c->y       (double) $401 = 5677316.4925473807
-    // (lldb) p c->r       (double) $403 = 1733.2493017905658
-
-//    double** r_array2;
-//    Status = cudaMemcpyFromSymbol(&r_array2, d_circles, size, 0, cudaMemcpyDeviceToHost);
-//    ERROR_CHECK(Status);
-
-
-//    cudaMalloc((void **) &dev_p, sizeof(point));
-//    cudaMemcpy(p, dev_p, sizeof(point), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **) &dev_idx, sizeof(int));
-//    cudaMemcpy(&idx, dev_idx, sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_idx, &idx, sizeof(int), cudaMemcpyHostToDevice);
-
-//    int blocksize = 32; // value usually chosen by tuning and hardware constraints
-//    int nblocks = nt / blocksize + 1; // value determine by block size and total work
-//    _cuda_find_containing_circle <<<nblocks, blocksize>>> (p->x, p->y, dev_idx, nt);
-//    _cuda_find_containing_circle <<<nt, 1>>> (p->x, p->y, dev_idx, nt);
-//    _cuda_find_containing_circle <<<gridSize, blockSize>>> (p->x, p->y, dev_idx, nt);
-    _cuda_find_containing_circle <<<1, nt>>> (p->x, p->y, dev_idx, nt);
-
-    int res;
-
-    Status = cudaMemcpy(&res, dev_idx, sizeof(int), cudaMemcpyDeviceToHost);
-
-//    cudaFree(dev_p);
-    cudaFree(dev_idx);
-
-    return idx;
-}
-
-__host__ void check_delaunay(){
-
-
-    // testing: make sure delaunay is set properly on the device
-    delaunay* test_d;
-    cudaMemcpy(test_d, dev_d, sizeof(delaunay), cudaMemcpyDeviceToHost);
-    printf("testing");
-}
-
-__host__ void cuda_set_delaunay(delaunay* d){
-
-    cudaError_t Status = cudaSuccess;
-
-//    cudaMalloc((void **)&dev_d, sizeof(delaunay));
-//    S h_struct = {1,2,3};
-//    S r_struct;
-
-    Status = cudaMemcpyToSymbol(dev_d, d, sizeof(struct delaunay));
-//    Status = cudaMemcpyToSymbol(d_struct, &h_struct, sizeof(S));
-//    Status = cudaMemcpyToSymbol(dev_d, d, sizeof(delaunay));
-    ERROR_CHECK(Status);
-
-    // testing: make sure delaunay is set properly on the device
-    delaunay test_d;
-    Status = cudaMemcpyFromSymbol(&test_d, dev_d, sizeof(struct delaunay), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-    printf("testing");
-
-
-    // STRUCT POINTER
-    int k[5]  = {1, 2, 3, 4, 5};
-    S h_struct2 ={11, 22, 33, k};
-    S* h_structp = &h_struct2;
-    S r_struct2;
-    Status = cudaMemcpyToSymbol(d_struct, h_structp, sizeof(h_structp)*2);
-    ERROR_CHECK(Status);
-
-    Status = cudaMemcpyFromSymbol(&r_struct2, d_struct, sizeof(d_struct)*2, 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-    printf("%d, %d, %d\n",r_struct2.x, r_struct2.y, r_struct2.z);
-}
-
-__host__ void cuda_set_circles(circle* c, int count) {
-
-    cudaError_t Status = cudaSuccess;
-
-    // tony: I am splitting the circle array into x, y, and r arrays.  This is b/c cuda was flattening my 2d array
-    // tony: causing the find circles function to fail.  This may not be elegant, but it ensures that the data exists
-    // tony: correctly on the device.  Performance can be improved by flattening this into a 1d array.
-    double* circlex;
-    double* circley;
-    double* circler;
-
-    circlex =(double*)malloc(sizeof(double)*count);
-    circley =(double*)malloc(sizeof(double)*count);
-    circler =(double*)malloc(sizeof(double)*count);
-
-    for (int i=0; i<count; i++){
-        circlex[i] = c[i].x;
-        circley[i] = c[i].y;
-        circler[i] = c[i].r;
+    double* ptx = (double*) malloc(npts * sizeof(double));
+    double* pty = (double*) malloc(npts * sizeof(double));
+    for (int i =0; i< npts; i++){
+        ptx[i] = pts[i][0];
+        pty[i] = pts[i][1];
     }
 
-    // todo: cx, cy, cr must be freed when the app completes.
-    // move the circle arrays onto the device.  These will be accessed in the find circles function
-    Status = cudaMemcpyToSymbol(cx, &circlex, sizeof(circlex), 0, cudaMemcpyHostToDevice);
-    ERROR_CHECK(Status);
+    double size = (3 * n_cir * sizeof(double)) +
+                  (2 * npts * sizeof(double)) +
+                  (npts * sizeof(int));
 
-    Status = cudaMemcpyToSymbol(cy, &circley, sizeof(circley), 0, cudaMemcpyHostToDevice);
-    ERROR_CHECK(Status);
+    cout << "Space allocated on Device: "<< size / 1000000<< " Mb" << endl;
 
-    Status = cudaMemcpyToSymbol(cr, &circler, sizeof(circler), 0, cudaMemcpyHostToDevice);
-    ERROR_CHECK(Status);
+    // move data onto device
+    HANDLE_ERROR(cudaMalloc((void **) &d_cx, n_cir * sizeof(double)));
+    HANDLE_ERROR(cudaMemcpy(d_cx, cx, n_cir * sizeof(double), cudaMemcpyHostToDevice));
 
-    Status = cudaMemcpyToSymbol(d_circle_count, &count, sizeof(int), 0, cudaMemcpyHostToDevice);
-    ERROR_CHECK(Status);
+    HANDLE_ERROR(cudaMalloc((void **) &d_cy, n_cir * sizeof(double)));
+    HANDLE_ERROR(cudaMemcpy(d_cy, cy, n_cir * sizeof(double), cudaMemcpyHostToDevice));
 
-    int h_circle_size = sizeof(circlex);
-    Status = cudaMemcpyToSymbol(d_circle_size, &h_circle_size, sizeof(int), 0, cudaMemcpyHostToDevice);
-    ERROR_CHECK(Status);
+    HANDLE_ERROR(cudaMalloc((void **) &d_cr, n_cir * sizeof(double)));
+    HANDLE_ERROR(cudaMemcpy(d_cr, cr, n_cir * sizeof(double), cudaMemcpyHostToDevice));
 
-    int h_circle_count;
-    Status = cudaMemcpyFromSymbol(&h_circle_count, d_circle_count, sizeof(int), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
+    HANDLE_ERROR(cudaMalloc((void **) &d_ptx, npts * sizeof(double)));
+    HANDLE_ERROR(cudaMemcpy(d_ptx, ptx, npts * sizeof(double), cudaMemcpyHostToDevice));
 
+    HANDLE_ERROR(cudaMalloc((void **) &d_pty, npts * sizeof(double)));
+    HANDLE_ERROR(cudaMemcpy(d_pty, pty, npts * sizeof(double), cudaMemcpyHostToDevice));
 
+    HANDLE_ERROR(cudaMalloc((void **) &d_idx, npts * sizeof(int)));
+
+    int *res = (int*)malloc(npts * sizeof(int));
+    _search_cuda_all <<< gridSize, blockSize >>> (d_ptx, d_pty, npts, d_cx, d_cy, d_cr, d_idx, n_cir);
+    HANDLE_ERROR(cudaMemcpy(res, d_idx, npts * sizeof(int), cudaMemcpyDeviceToHost));
+
+//    cout << "-----------------\n";
+//    for (int i = npts-10; i < npts; i++){
+//        double valid = (cx[res[i]] - ptx[i] ) * (cx[res[i]] - ptx[i] ) + (cy[res[i]] - pty[i]) * (cy[res[i]] - pty[i]);
+//        cout << "Index " << i << ", POINT(" << ptx[i] << ", " << pty[i] << ") IDX: " << res[i] << "\t\t\t" << valid << endl;
+//    }
 
     // free memory
-    free(circlex);
-    free(circley);
-    free(circler);
+    cudaFree(d_idx);
+    cudaFree(d_cx);
+    cudaFree(d_cy);
+    cudaFree(d_cr);
+    cudaFree(d_ptx);
+    cudaFree(d_pty);
 
-
-    //    Checking to see if the arrays were loaded onto the device correctly.
-    double *rcx;
-    Status = cudaMemcpyFromSymbol(&rcx, cx, sizeof(circlex), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-
-    double *rcy;
-    Status = cudaMemcpyFromSymbol(&rcy, cy, sizeof(circley), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-
-    double *rcr;
-    Status = cudaMemcpyFromSymbol(&rcr, cr, sizeof(circler), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-
-    printf("%3.1f %3.1f %3.1f\n", rcx[398], rcy[398], rcr[398]);
-
-//    free(&rcx);
-//    free(rcy);
-//    free(rcr);
-
-
-    // idx = 398
-    // (x = 593633.92188352742, y = 5677316.4925473807, r = 1733.2493017905658)
-
-
-
-    // read the circle structure into a simple array
-//    double circle_array[count][3];
-//    for (int i=0; i<count; i++){
-//        circle_array[i][0] = c[i].x;
-//        circle_array[i][1] = c[i].y;
-//        circle_array[i][2] = c[i].r;
-//    }
-
-
-
-
-
-//    Status = cudaMemcpyToSymbol(d_circles_const, &circle_array, sizeof(circle_array), 0, cudaMemcpyHostToDevice);
-//    ERROR_CHECK(Status);
-
-//    int** r_array2;
-//    Status = cudaMemcpyFromSymbol(&r_array2, d_circles, sizeof(circle_array), 0, cudaMemcpyDeviceToHost);
-//    ERROR_CHECK(Status);
-
-
-////    double** circle_array = (double**) malloc(count * sizeof(double*));
-//    double** circle_array;
-//    circle_array = (double**) malloc(count * sizeof(double*));
-//    for (int i=0; i<count; i++){
-//        circle_array[i] = (double*) malloc(3 * sizeof(double));
-//        circle_array[i][0] = i; //c[i].x;
-//        circle_array[i][1] = i; //c[i].y;
-//        circle_array[i][2] = i; //c[i].r;
-//    }
-
-//    cudaMalloc((void**)&d_circles, count * sizeof(double*));
-//    for (int i=0; i < count; i++){
-//        cudaMalloc((void**)&d_circles[i], 3* sizeof(double));
-//    }
-
-//    Status = cudaMemcpyToSymbol(d_circles, &circle_array, sizeof(circle_array), 0, cudaMemcpyHostToDevice);
-//    ERROR_CHECK(Status);
-
-
-
-
-//    int** r_array2;
-//    Status = cudaMemcpyFromSymbol(&r_array2, d_circles, sizeof(circle_array), 0, cudaMemcpyDeviceToHost);
-//    ERROR_CHECK(Status);
-
-//    // free the circle array
-//    for(int i=0; i < count; i++){
-//        free(circle_array[i]);
-//    }
-//    free(circle_array);
-
-//    // Dynamic array size
-//    int* h_array2;
-//    h_array2 = (int*) malloc(10);
-//    for (int i=0; i<10; i++){
-//        h_array2[i] = i;
-//    }
-//    Status = cudaMemcpyToSymbol(d_array, &h_array2, sizeof(h_array2), 0, cudaMemcpyHostToDevice);
-//    ERROR_CHECK(Status);
-//
-//    int* r_array2;
-//    Status = cudaMemcpyFromSymbol(&r_array2, d_array, sizeof(h_array2), 0, cudaMemcpyDeviceToHost);
-//    ERROR_CHECK(Status);
-
-
-
-
-//    free(r_array);
-//    free(h_array);
-
-    // allocate space for the d_circles array
-//    Status = cudaMalloc(&d_circles, sizeof(circle)*count);
-//    ERROR_CHECK(Status);
-
-//    Status = cudaMemcpyToSymbol(d_circles, c, sizeof(circle)*count);
-//    ERROR_CHECK(Status);
-
-//    Status = cudaMemcpyToSymbol(d_circle_count, &count, sizeof(int));
-//    ERROR_CHECK(Status);
-
-//    int h_circle_count;
-//    Status = cudaMemcpyFromSymbol(&h_circle_count, d_circle_count, sizeof(int), 0, cudaMemcpyDeviceToHost);
-//    ERROR_CHECK(Status);
-
-//    circle h_circles[h_circle_count];
-//    Status = cudaMemcpyFromSymbol(h_circles, d_circles, sizeof(circle)*h_circle_count, 0, cudaMemcpyDeviceToHost);
-//    ERROR_CHECK(Status);
-
-
-
-
+    return 1;
 }
 
 
-__host__ void cuda_test_get_global_circles(circle* c, int count) {
-
-    cudaError_t Status = cudaSuccess;
-
-    double *circlex;
-    double *circley;
-    double *circler;
-
-    circlex = (double *) malloc(sizeof(double) * count);
-    circley = (double *) malloc(sizeof(double) * count);
-    circler = (double *) malloc(sizeof(double) * count);
-
-    for (int i = 0; i < count; i++) {
-        circlex[i] = c[i].x;
-        circley[i] = c[i].y;
-        circler[i] = c[i].r;
-    }
-
-    //    Checking to see if the arrays were loaded onto the device correctly.
-    double *rcx;
-    Status = cudaMemcpyFromSymbol(&rcx, cx, sizeof(double), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-
-    double *rcy;
-    Status = cudaMemcpyFromSymbol(&rcy, cy, sizeof(circley), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
-
-    double *rcr;
-    Status = cudaMemcpyFromSymbol(&rcr, cr, sizeof(circler), 0, cudaMemcpyDeviceToHost);
-    ERROR_CHECK(Status);
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Check the return value of the CUDA runtime API call and exit
+ * the application if the call has failed.
+ */
+static void CheckCudaErrorAux (const char *file, unsigned line, const char *statement, cudaError_t err)
+{
+    if (err == cudaSuccess)
+        return;
+    cerr << statement<<" returned " << cudaGetErrorString(err) << "("<<err<< ") at "<<file<<":"<<line << std::endl;
+    exit (1);
 }

@@ -478,7 +478,7 @@ static int _nnpi_calculate_weights(nnpi* nn, point* p)
     int* tids = NULL;
     int i;
 
-    // tony: need to cudaize
+    // cuda: need to cudaize
     delaunay_circles_find(nn->d, p, &nn->ncircles, &tids);
     if (nn->ncircles == 0)
         return 1;
@@ -707,20 +707,21 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
  */
 void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point pout[])
 {
-    // tony: set the delaunay object in the device!
+    // build the delaunay triangles
     delaunay* d = delaunay_build(nin, pin, 0, NULL, 0, NULL);
 
     // set the circles array in the device
     // note: d->ntriangles == number of circles
-//    circle circles[d->ntriangles];
-    circle* circles;
-    circles = (circle*) malloc (d->ntriangles+1);
-    for (int c =0; c < d->ntriangles; c++){
-        circles[c] = (circle) d->circles[c];
-    }
+//    circle* circles;
+//    circles = (circle*) malloc (d->ntriangles+1);
+//    int c;
+//    for (c =0; c < d->ntriangles; c++){
+//        circles[c] = (circle) d->circles[c];
+//    }
 
+    // cuda: note, this will not work because the arrays are too large for gpu global memory
 //    cuda_set_delaunay(d);
-    cuda_set_circles(circles, d->ntriangles);
+//    cuda_set_circles(circles, d->ntriangles);
 //    cuda_test_get_global_circles(circles, d->ntriangles);
 
 
