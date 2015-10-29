@@ -19,6 +19,7 @@ elseif(UNIX)
 #    set(CUDA_COMPILER_BINDIR "/usr/bin" CACHE PATH "Path for g++ binary for nvcc")
     include_directories("/usr/local/cuda/include/")
     include_directories("/usr/local/cuda/samples/common/inc/")
+#    include_directories("/usr/include/c++/4.8.2/")
 else()
     message("Windows is not currently supported for this software")
     return()
@@ -33,6 +34,7 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}) #;-O3 -gencode arch=compute_22,code=sm_2
 
 #LIST(APPEND CMAKE_CXX_FLAGS "-std=c++0x -O3 -ffast-math -Wall")
 LIST(APPEND CMAKE_CXX_FLAGS "-std=c99 -O3 -ffast-math -Wall")
+
 
 LIST(APPEND CUDA_NVCC_FLAGS --compiler-options -fno-strict-aliasing -lineinfo -use_fast_math -Xptxas -dlcm=cg)
 #LIST(APPEND CUDA_NVCC_FLAGS -gencode arch=compute_20,code=sm_20)

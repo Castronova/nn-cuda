@@ -1,10 +1,13 @@
 #ifndef _CUDA_FUNCS_H
 #define _CUDA_FUNCS_H
 
-//#include "nn.h"
+#include "nn.h"
 //#include "delaunay.h"
 
 //namespace cuda_funcs{
+
+// necessary for the triangle struct
+#include "delaunay.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,7 +20,14 @@ extern "C" {
 //void cuda_test_get_global_circles(circle* c, int count);
 
 //void cuda_delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
-int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir);
+
+
+//int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir);
+int* cuda_delaunay_circles_find_all(delaunay* d, point* p, int npts);
+int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts);
+void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_triangles, int** point_triangles,
+                                               triangle* triangles, double* ptx, double* pty, int npts, double* cx, double* cy, double* cr,
+                                               int* n_out, int** v_out);
 }
 #else
 //
@@ -29,7 +39,12 @@ int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double
 //void cuda_test_get_global_circles(circle* c, int count);
 //void cuda_delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
 
-int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir);
+//int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir);
+int* cuda_delaunay_circles_find_all(delaunay* d, point* p, int npts);
+int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts);
+void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_triangles, int** point_triangles,
+                                    triangle* triangles, double* ptx, double* pty, int npts, double* cx, double* cy, double* cr,
+                                    int* n_out, int** v_out);
 
 #endif
 
