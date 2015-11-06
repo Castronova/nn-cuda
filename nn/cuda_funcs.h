@@ -28,6 +28,7 @@ void cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts, 
 void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_triangles, int** point_triangles,
                                                triangle* triangles, double* ptx, double* pty, int npts, double* cx, double* cy, double* cr,
                                                int* n_out, int** v_out);
+void cuda_sibson_weights(nnpi* nn, point* p, int** tids);
 }
 #else
 //
@@ -45,6 +46,7 @@ void cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts, 
 void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_triangles, int** point_triangles,
                                     triangle* triangles, double* ptx, double* pty, int npts, double* cx, double* cy, double* cr,
                                     int* n_out, int** v_out);
+void cuda_sibson_weights(nnpi* nn, point* p, int** tids);
 
 #endif
 
