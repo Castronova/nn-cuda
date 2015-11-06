@@ -102,4 +102,7 @@ struct delaunay {
 void delaunay_circles_find(delaunay* d, point* p, int* n, int** out);
 int delaunay_xytoi(delaunay* d, point* p, int seed);
 
+// cuda version of the delaunay circles find function
+void delaunay_circles_find_all(delaunay* d, point* p, int* n, int** out, int npts);
+
 #endif

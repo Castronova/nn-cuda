@@ -48,7 +48,7 @@
  *   else
  *     do more complicated stuff
  */
-#define N_SEARCH_TURNON 20
+#define N_SEARCH_TURNON 20000
 #define N_FLAGS_TURNON 1000
 #define N_FLAGS_INC 100
 
@@ -446,6 +446,9 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
      * useful in some cases when point p coincided with one of the vertices
      * of a thin triangle. 
      */
+
+    printf("POINT(%3.5f,%3.5f)   ", p[0].x, p[0].y);
+
     int contains = 0;
     int i;
 
@@ -502,8 +505,9 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
              */
             for (i = 0; i < nn; ++i) {
                 tid = d->t_out->v[i];
-                if (circle_contains(&d->circles[tid], p))
-                    break;
+                if (circle_contains(&d->circles[tid], p)){
+//                    printf("+  %3.5f, %3.5f, %3.5f: \t %d\n", p->x, p->y, p->z,tid);
+                    break;}
             }
             /*
              * if unsuccessful, search through all circles 
@@ -522,6 +526,11 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
                 }
                 d1 = clock() - s1;
 
+                // 0   = {593653.20008527522, 5679200.3031280898, 79.454795662504594}
+                // 1   = {593653.20008527522, 5679200.3031280898, 79.454795662504594}
+                // 398 = {593653.20008527522, 5679200.3031280898, 79.454795662504594}
+
+//                printf("++ %3.5f, %3.5f, %3.5f: \t %d\n", p->x, p->y, p->z,tid);
 
 //                s2 = clock();
 //                int tid2 = cuda__get_circle(d, p, nt);
@@ -547,6 +556,8 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
             d->first_id = tid;
         }
     }
+//    if (d->first_id > 0 || circle_contains(&d->circles[d->first_id], p))
+//        printf("%3.5f, %3.5f, %3.5f: \t %d\n", p->x, p->y, p->z,d->first_id);
 
     // cuda: 1.) find all intersecting (above)
     // cuda: 2.) for each point, execute the following code
@@ -561,11 +572,13 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
     /*
      * main cycle 
      */
+    printf("\n");
     while (d->t_in->n > 0) {
         int tid = istack_pop(d->t_in);
         triangle* t = &d->triangles[tid];
-
+//        printf("CHECKING TID: %d... ", tid);
         if (contains || circle_contains(&d->circles[tid], p)) {
+//            printf("CIRCLE CONTAINS");
             istack_push(d->t_out, tid);
             for (i = 0; i < 3; ++i) {
                 int vid = t->vids[i];
@@ -582,10 +595,15 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
                     }
                 }
             }
+
         }
+//        else{
+//            printf(" CIRCLE DOESN'T CONTAIN ");
+//        }
+//        printf("\n");
         contains = 0;
     }
-
+    printf("\n");
     *n = d->t_out->n;
     *out = d->t_out->v;
     delaunay_resetflags(d);
@@ -593,7 +611,7 @@ void delaunay_circles_find(delaunay* d, point* p, int* n, int** out)
 
 
 // cuda: this function leverages cuda to findall delaunay intersections
-void delaunay_circles_find_all(delaunay* d, point* p, int* n, int** out)
+void delaunay_circles_find_all(delaunay* d, point* p, int* n, int** out, int npts)
 {
     /*
      * This flag was introduced as a hack to handle some degenerate cases. It
@@ -603,155 +621,205 @@ void delaunay_circles_find_all(delaunay* d, point* p, int* n, int** out)
      * useful in some cases when point p coincided with one of the vertices
      * of a thin triangle.
      */
-    int contains = 0;
-    int i;
+//    int contains = 0;
 
 
 
-//    /*
-//     * if there are only a few data points, do linear search
-//     */
-//    if (d->ntriangles <= N_SEARCH_TURNON) {
+
+
+
+    double nt = d->ntriangles;
+
+    clock_t s2, d2;
+    s2 = clock();
+//    int* tids = cuda_delaunay_circles_find_all(d, p, npts);
+    int *matches, *nmatches;
+    cuda_delaunay_circles_find_all_tricircles(d, p, npts, matches, nmatches);
+    d2 = clock() - s2;
+
+    int *tids; // this needs to be initialized using matches and nmatches (above)
+
+
+    // ---------------------------------
+    // testing find_neighboring delaunay
+    // ---------------------------------
+
+    int n_cir = d->ntriangles;
+    // reconstruct the delauney objects into simple arrays
+    double cx[d->ntriangles], cy[d->ntriangles], cr[d->ntriangles];
+    int l;
+    for (l=0; l<d->ntriangles; l++){
+        cx[l] = d->circles[l].x;
+        cy[l] = d->circles[l].y;
+        cr[l] = d->circles[l].r;
+
+    }
+    // reconstruct the point object into simple arrays
+    double* ptx = (double*) malloc(npts * sizeof(double));
+    double* pty = (double*) malloc(npts * sizeof(double));
+    for (l =0; l< npts; l++){
+        ptx[l] = p[l].x;
+        pty[l] = p[l].y;
+    }
+
+
+    int* n_out;
+    int** v_out;
+    n_out = (int*) malloc(sizeof(int) * (int)nt);
+    v_out = (int**) malloc(sizeof(int*) * (int)nt);
+    for (l = 0; l <nt; l++){
+
+        // initialize vertex array to a sufficiently large size (i.e. 100)
+        v_out[l] = (int*) malloc(sizeof(int) * 100);
+    }
+
+    cuda_find_neighboring_delaunay(nt, tids, d->n_point_triangles, d->point_triangles, d->triangles,
+    ptx, pty, npts, cx, cy, cr, n_out, v_out);
+
+
+    // ---------------------------------
+
+
+
+
+//    if (tid != tid2){
+//        printf("No match found....somethings wrong!");
+//        exit(1);
+//    }
+
+//    int t1 = d1 * 1000 / CLOCKS_PER_SEC;
+//    int t2 = d2 * 1000 / CLOCKS_PER_SEC;
+//    printf("%d --> %d\n", t1, t2);
+
+
+
+// cuda: need to implement this code
+// cuda ---------------------------------
+//    if (tid == nt) {
 //        istack_reset(d->t_out);
-//
-//        for (i = 0; i < d->ntriangles; ++i) {
-//            if (circle_contains(&d->circles[i], p)) {
-//                istack_push(d->t_out, i);
-//            }
-//        }
-//
-//        *n = d->t_out->n;
-//        *out = d->t_out->v;
-//
-//        return;
+//        *n = 0;
+//        *out = NULL;
+//        return;     /* failed */
 //    }
-//    /*
-//     * otherwise, do a more complicated stuff
-//     */
 //
-//    /*
-//     * It is important to have a reasonable seed here. If the last search
-//     * was successful -- start with the last found tricircle, otherwhile (i)
-//     * try to find a triangle containing p; if fails then (ii) check
-//     * tricircles from the last search; if fails then (iii) make linear
-//     * search through all tricircles
-//     */
-//    if (d->first_id < 0 || !circle_contains(&d->circles[d->first_id], p)) {
-//        /*
-//         * if any triangle contains p -- start with this triangle
-//         */
-//        d->first_id = delaunay_xytoi(d, p, d->first_id);
-//        contains = (d->first_id >= 0);
+//            // todo: loop through each match
+//            // for id in matched_ids
+//            //      istack_reset(d->t_in);
+//            //      istack_reset(d->t_out);
+//            //      d->first_id = tid;
+//            //      ...
+//            //      ..
 //
-//        /*
-//         * if no triangle contains p, there still is a chance that it is
-//         * inside some of circumcircles
-//         */
-//        if (d->first_id < 0) {
-//            int nn = d->t_out->n;
-//            int tid = -1;
-//
-//            /*
-//             * first check results of the last search
-//             */
-//            for (i = 0; i < nn; ++i) {
-//                tid = d->t_out->v[i];
-//                if (circle_contains(&d->circles[tid], p))
-//                    break;
-//            }
-//            /*
-//             * if unsuccessful, search through all circles
-//             */
-//            if (tid < 0 || i == nn) {
+//            d->first_id = tid;
+// cuda ---------------------------------
 
-
-                double nt = d->ntriangles;
-
-                clock_t s1, s2, d1, d2;
-                // tony: this is horribly slow!  this could check every triangle!!!
-
-
-                s1 = clock();
-                int tid;
-                for (tid = 0; tid < nt; ++tid) {
-                    if (circle_contains(&d->circles[tid], p))
-                        break;
-                }
-                d1 = clock() - s1;
-
-
-//                s2 = clock();
-//                int tid2 = cuda__get_circle(d, p, nt);
-//                d2 = clock() - s2;
-
-
-//                if (tid != tid2){
-//                    printf("No match found....somethings wrong!");
-//                    exit(1);
-//                }
-
-//                int t1 = d1 * 1000 / CLOCKS_PER_SEC;
-//                int t2 = d2 * 1000 / CLOCKS_PER_SEC;
-//                printf("%d --> %d\n", t1, t2);
-
-                if (tid == nt) {
-                    istack_reset(d->t_out);
-                    *n = 0;
-                    *out = NULL;
-                    return;     /* failed */
-                }
-
-            // todo: loop through each match
-            // for id in matched_ids
-            //      istack_reset(d->t_in);
-            //      istack_reset(d->t_out);
-            //      d->first_id = tid;
-            //      ...
-            //      ..
-
-            d->first_id = tid;
-//        }
-//    }
 
     // cuda: 1.) find all intersecting (above)
     // cuda: 2.) for each point, execute the following code
 
-    istack_reset(d->t_in);
-    istack_reset(d->t_out);
+    int i, point_idx;
+    for (point_idx=0; point_idx < npts; point_idx++){
 
-    istack_push(d->t_in, d->first_id);
-    d->flags[d->first_id] = 1;
-    delaunay_addflag(d, d->first_id);
+        if (point_idx == 5)
+            exit(0);
 
-    /*
-     * main cycle
-     */
-    while (d->t_in->n > 0) {
-        int tid = istack_pop(d->t_in);
-        triangle* t = &d->triangles[tid];
+        int contains = 0;
 
-        if (contains || circle_contains(&d->circles[tid], p)) {
-            istack_push(d->t_out, tid);
-            for (i = 0; i < 3; ++i) {
-                int vid = t->vids[i];
-                int nt = d->n_point_triangles[vid];
-                int j;
+        if (d->t_in == NULL) {
+            d->t_in = istack_create();
+            d->t_out = istack_create();
+        }
 
-                for (j = 0; j < nt; ++j) {
-                    int ntid = d->point_triangles[vid][j];
+        // set the delaunay first id
+        d->first_id = tids[point_idx];
 
-                    if (d->flags[ntid] == 0) {
-                        istack_push(d->t_in, ntid);
-                        d->flags[ntid] = 1;
-                        delaunay_addflag(d, ntid);
+
+        istack_reset(d->t_in);
+        istack_reset(d->t_out);
+
+        istack_push(d->t_in, d->first_id);
+        d->flags[d->first_id] = 1;
+        delaunay_addflag(d, d->first_id);
+
+        point* P = &p[point_idx];
+        printf("POINT(%3.5f,%3.5f)   ", p[point_idx].x, p[point_idx].y);
+
+        /*
+        * main cycle
+        */
+        while (d->t_in->n > 0) {
+            int tid = istack_pop(d->t_in);
+            triangle* t = &d->triangles[tid];
+
+
+            if (contains || circle_contains(&d->circles[tid], p)) {
+                printf("%d ",tid);
+                istack_push(d->t_out, tid);
+                for (i = 0; i < 3; ++i) {
+                    int vid = t->vids[i];
+                    int nt = d->n_point_triangles[vid];
+                    int j;
+
+                    for (j = 0; j < nt; ++j) {
+                        int ntid = d->point_triangles[vid][j];
+
+                        if (d->flags[ntid] == 0) {
+                            istack_push(d->t_in, ntid);
+                            d->flags[ntid] = 1;
+                            delaunay_addflag(d, ntid);
+                        }
                     }
                 }
             }
+            contains = 0;
         }
-        contains = 0;
+
+        *n = d->t_out->n;
+        *out = d->t_out->v;
+        printf("\n");
+//        n[i] = d->t_out->n;
+//        out[i][0] = d->t_out->v;
+        delaunay_resetflags(d);
+
+
     }
 
-    *n = d->t_out->n;
-    *out = d->t_out->v;
-    delaunay_resetflags(d);
+//    istack_reset(d->t_in);
+//    istack_reset(d->t_out);
+//
+//    istack_push(d->t_in, d->first_id);
+//    d->flags[d->first_id] = 1;
+//    delaunay_addflag(d, d->first_id);
+
+//    /*
+//     * main cycle
+//     */
+//    while (d->t_in->n > 0) {
+//        int tid = istack_pop(d->t_in);
+//        triangle* t = &d->triangles[tid];
+//
+//        if (contains || circle_contains(&d->circles[tid], p)) {
+//            istack_push(d->t_out, tid);
+//            for (i = 0; i < 3; ++i) {
+//                int vid = t->vids[i];
+//                int nt = d->n_point_triangles[vid];
+//                int j;
+//
+//                for (j = 0; j < nt; ++j) {
+//                    int ntid = d->point_triangles[vid][j];
+//
+//                    if (d->flags[ntid] == 0) {
+//                        istack_push(d->t_in, ntid);
+//                        d->flags[ntid] = 1;
+//                        delaunay_addflag(d, ntid);
+//                    }
+//                }
+//            }
+//        }
+//        contains = 0;
+//    }
+//
+//    *n = d->t_out->n;
+//    *out = d->t_out->v;
+//    delaunay_resetflags(d);
 }

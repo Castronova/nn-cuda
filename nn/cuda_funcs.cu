@@ -196,8 +196,8 @@ void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_
 
 
 
-
-__global__ void _search_cuda_all_tricircles(double* ptx, double* pty, int npts, double* cx, double* cy, double* cr, int* fidx, int count, triangle* triangles){
+// This function performs the equivilent of the linear search in delaunay.c, delaunay_circles_find() (line 463)
+__global__ void _cuda_search_all_tricircles(double* ptx, double* pty, int npts, double* cx, double* cy, double* cr, int* fidx, int count, int *outCount){
 //     pts:    2d array of search point coordinates
 //     npts:   size of the pts array (i.e. number of total points)
 //     cx:     circle x coordinates
@@ -205,6 +205,7 @@ __global__ void _search_cuda_all_tricircles(double* ptx, double* pty, int npts, 
 //     cz:     circle z coordinates
 //     fidx:   array of circle indices in which the pts intersect
 //     count:  number of circles
+//     outCount: number of matching circles for each point index
 
     int idx = 0;
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -227,27 +228,15 @@ __global__ void _search_cuda_all_tricircles(double* ptx, double* pty, int npts, 
             double dist = (cx[i] - px) * (cx[i] - px) + (cy[i] - py) * (cy[i] - py);
             double radi = cr[i] * cr[i];
 
-//            // exit loop early if a match is found
+            // check for tricircle match
             if (dist <= radi) {
                 fidx[stidx+ idx] = i;
                 idx ++;
-////                break;
             }
-
-//            if (idx < 30){
-//                fidx[stidx + idx] = tid;
-//                idx ++;
-//            }
         }
-//
-//        // eliminate tricircles that aren't contiguous
-//        for (i = 0; i < 30; i++){
-//            int value = fidx[i];
-//            if (value != -999){
-//
-//            }
-//        }
 
+        // save the idx count
+        outCount[tid] = idx;
 
         // increment thread id
         tid += blockDim.x * gridDim.x;
@@ -255,7 +244,7 @@ __global__ void _search_cuda_all_tricircles(double* ptx, double* pty, int npts, 
 }
 
 
-// This function performs the equivilent of the linear search in delaunay.c, delaunay_circles_find() (line 463)
+
 __global__ void _search_cuda_all(double* ptx, double* pty, int npts, double* cx, double* cy, double* cr, int* fidx, int count){
 //     pts:    2d array of search point coordinates
 //     npts:   size of the pts array (i.e. number of total points)
@@ -391,7 +380,7 @@ int* cuda_delaunay_circles_find_all(delaunay* d, point* p, int npts){
 
 
 
-int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts){
+void cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts, int **matches, int **nmatches){
 
     // reconstruct the point object into simple arrays
     double* ptx = (double*) malloc(npts * sizeof(double));
@@ -411,8 +400,6 @@ int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts){
 
     }
 
-
-
     cudaGetDevice(0);
     cudaDeviceReset();
 
@@ -425,7 +412,7 @@ int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts){
     // Round up according to array size
     gridSize = (npts + blockSize - 1) / blockSize;
 
-    int* d_idx;
+    int* d_idx, *d_count;
     double *d_cx, *d_cy, *d_cr, *d_ptx, *d_pty;
     triangle *d_triangles;
 
@@ -450,127 +437,18 @@ int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts){
 
     // allocate 30 spaces for each point (flattened array)
     HANDLE_ERROR(cudaMalloc((void **) &d_idx, 30 * npts * sizeof(int)));
+    HANDLE_ERROR(cudaMalloc((void **) &d_count, npts * sizeof(int)));
 
-    int *res = (int*)malloc(30 * npts * sizeof(int));
-    _search_cuda_all_tricircles <<< gridSize, blockSize >>> (d_ptx, d_pty, npts, d_cx, d_cy, d_cr, d_idx, n_cir, d_triangles);
-    HANDLE_ERROR(cudaMemcpy(res, d_idx, 30 * npts * sizeof(int), cudaMemcpyDeviceToHost));
+    *matches = (int*)malloc(30 * npts * sizeof(int));
+    *nmatches = (int*)malloc(npts * sizeof(int));
+    _cuda_search_all_tricircles <<< gridSize, blockSize >>> (d_ptx, d_pty, npts, d_cx, d_cy, d_cr, d_idx, n_cir, d_count);
+    HANDLE_ERROR(cudaMemcpy(*matches, d_idx, 30 * npts * sizeof(int), cudaMemcpyDeviceToHost));
+    HANDLE_ERROR(cudaMemcpy(*nmatches, d_count, npts * sizeof(int), cudaMemcpyDeviceToHost));
 
-
-
-    // 593424.65000, 5676316.98000, 0.00000: 	 398
-    // 593449.67715, 5676316.98000, 0.00000: 	 398
-    // 593474.70430, 5676316.98000, 0.00000: 	 398
-    // 593499.73145, 5676316.98000, 0.00000: 	 398
-    // 593524.75860, 5676316.98000, 0.00000: 	 398
-    // 593549.78575, 5676316.98000, 0.00000: 	 398
-    // 593574.81290, 5676316.98000, 0.00000: 	 398
-    // 593599.84005, 5676316.98000, 0.00000: 	 398
-
-    int ids[5] = {0, 100, 500, 800, 1000};
-    std::cout << "-----------------\n";
-    for (int cnt = 0; cnt < 5; cnt++){
-        int i = ids[cnt];
-        printf("POINT(%3.5f, %3.5f)    ", ptx[i], pty[i]);
-        for (int j=0; j < 30; j++){
-            printf("%d ", res[i*30 + j]);
-        }
-        std::cout << std::endl;
-//        cout << "res " << i << ": " << res[i] << endl;
-//        if (res[i] >= 0) {
-//            double valid = (cx[res[i]] - ptx[i]) * (cx[res[i]] - ptx[i]) + (cy[res[i]] - pty[i]) * (cy[res[i]] - pty[i]);
-//            cout << "Index " << i << ", POINT(" << ptx[i] << ", " << pty[i] << ") IDX: " << res[i] << "\t\t\t" <<
-//            valid << endl;
-//        }
-    }
-
-//    // TEST - move into kernel
-//    printf("\n\n");
-//    // eliminate tricircles that aren't contiguous
-//    int i, j, k;
-//    int vids [3 * 30];
-//    int count = 0;
-//    // populate the array with triangle vertex indices
-//    printf("ARRAY\n");
-//    for (i = 0; i < 30; i++){
-//        int value = res[i];
-////        printf("%d : ", res[i]);
-//        if (value != -999){
-//            for (j=0; j<3; j++){
-//                vids[3*i + j] = d->triangles[value].vids[j];
-//                printf("%d : %d\n",res[i], d->triangles[value].vids[j]);
-//                count ++;
-//            }
-//
-//        }
-//    }
-//    printf("\n");
-//
-//    printf("%d VIDs\n", count);
-//
-//    printf("MATCHES\n");
-//    int tricircle_ids [30];
-//    int tricircle_count = 0;
-//    int idx = 0;
-//    // loop through result ids
-//    for (i =0; i < 30; i++){
-//        int tri_id = res[i];
-//        int found = 0;
-//        // loop through
-//        for (k = 0; k < 3; k++) {
-//            int vid = d->triangles[tri_id].vids[k];
-//            printf("%d | %d : %d", (i*3)+k, res[i], vid);
-//            // count occurences
-//            for (j = 0; j < count; j++) {
-//                if (vid == vids[j]) {
-//                    found++;
-//                    printf("*");
-//                }
-//            }
-//            printf("\n");
-//
-//            if (found > 2) {
-//
-//                // make sure this id isn't already saved
-//                int saved = 0;
-//                int res_idx = idx / 3;
-//                for (j = 0; j < idx; j++) {
-//                    if (tricircle_ids[j] == res[i]){
-//                        saved = 1;
-//                        break;
-//                    }
-//                }
-//                if(!saved){
-//                    tricircle_ids[idx] = res[i];
-//                    idx++;
-////                    printf("Saving index : %d \n", res[i]);
-//                }
-////                tricircle_ids[idx] = res[res_idx];
-////                idx++;
-//            }
-//        }
-//    }
-//
-//    printf("FINAL RESULT\n");
-//    printf("\nPOINT(%3.5f, %3.5f)    ", ptx[0], pty[0]);
-//    for(i=0; i<idx; i++){
-//        printf("%d ", tricircle_ids[i]);
-//    }
-//    printf("\n\n");
-//
-//    for(i=0; i<idx; i++){
-//        int t =  tricircle_ids[i];
-//        printf("%3.5f %3.5f, %3.5f %3.5f, %3.5f %3.5f\n",
-//               d->points[d->triangles[t].vids[0]].x,
-//               d->points[d->triangles[t].vids[0]].y,
-//               d->points[d->triangles[t].vids[1]].x,
-//               d->points[d->triangles[t].vids[1]].y,
-//               d->points[d->triangles[t].vids[2]].x,
-//               d->points[d->triangles[t].vids[3]].y);
-//    }
-//    printf("\n");
 
     // free memory
     cudaFree(d_idx);
+    cudaFree(d_count);
     cudaFree(d_cx);
     cudaFree(d_cy);
     cudaFree(d_cr);
@@ -578,24 +456,7 @@ int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts){
     cudaFree(d_pty);
     cudaFree(d_triangles);
 
-    // return the search idx array
-    return res;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 /**
@@ -609,3 +470,5 @@ static void CheckCudaErrorAux (const char *file, unsigned line, const char *stat
     std::cerr << statement<<" returned " << cudaGetErrorString(err) << "("<<err<< ") at "<<file<<":"<<line << std::endl;
     exit (1);
 }
+
+

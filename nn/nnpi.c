@@ -74,6 +74,7 @@
 //#include "nn.h"
 #include "nn_internal.h"
 #include "cuda_funcs.h"
+#include "nn.h"
 
 //struct nnpi {
 //    delaunay* d;
@@ -478,8 +479,10 @@ static int _nnpi_calculate_weights(nnpi* nn, point* p)
     int* tids = NULL;
     int i;
 
-    // cuda: need to cudaize
+    // c[51491], p[500]
+    // tony: need to cudaize
     delaunay_circles_find(nn->d, p, &nn->ncircles, &tids);
+
     if (nn->ncircles == 0)
         return 1;
 
@@ -633,6 +636,7 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
 
     nnpi_calculate_weights(nn, p);
 
+
 //    if (nn_verbose) {
 //        if (nn_test_vertice == -1) {
 //            indexedvalue* ivs = NULL;
@@ -707,13 +711,15 @@ void nnpi_interpolate_point(nnpi* nn, point* p)
  */
 void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point pout[])
 {
-    // build the delaunay triangles
+
     delaunay* d = delaunay_build(nin, pin, 0, NULL, 0, NULL);
 
     // set the circles array in the device
     // note: d->ntriangles == number of circles
+//    circle circles[d->ntriangles];
 //    circle* circles;
-//    circles = (circle*) malloc (d->ntriangles+1);
+//    circles = (circle*) mall
+// oc (d->ntriangles+1);
 //    int c;
 //    for (c =0; c < d->ntriangles; c++){
 //        circles[c] = (circle) d->circles[c];
@@ -740,8 +746,22 @@ void nnpi_interpolate_points(int nin, point pin[], double wmin, int nout, point 
         }
     }
 
-    for (i = 0; i < nout; ++i)
-        nnpi_interpolate_point(nn, &pout[i]);
+    // todo: undo these changes
+//    for (i = 0; i < nout; ++i) {
+    int ids[5] = {0, 100, 500, 800, 1000};
+
+    for (i = 0; i < 5; ++i) {
+//        printf("%d: %3.5f, %3.5f, %3.5f\n",i,pout[i].x, pout[i].y, pout[i].z);
+
+//        nnpi_interpolate_point(nn, &pout[i]);
+        nnpi_interpolate_point(nn, &pout[ids[i]]);
+    }
+
+//    // this function is to test the find all tricircles function
+//    cuda_delaunay_circles_find_all_tricircles(d, pout, nout);
+
+
+    nnpi_interpolate_point_all(nn, &pout[i], nout);
 
     if (nn_verbose) {
         fprintf(stderr, "output:\n");
@@ -970,6 +990,222 @@ void nnhpi_setwmin(nnhpi* nn, double wmin)
 {
     nn->nnpi->wmin = wmin;
 }
+
+
+
+
+
+
+
+
+static void _nnpi_calculate_weights_all(nnpi* nn, point* p, int npts, int *success)
+{
+    int* tids = NULL;
+    int i, j, c;
+
+    // tony: need to cudaize
+//    delaunay_circles_find_all(nn->d, p, &nn->ncircles, &tids, npts);
+    // this function is to test the find all tricircles function
+    //cuda
+//    int *matches = (int*)malloc(npts*sizeof(int));
+    int *matches, *nmatches;
+    cuda_delaunay_circles_find_all_tricircles(nn->d, p, npts, &matches, &nmatches);
+
+
+
+//    if (nn->ncircles == 0)
+//        return 1;
+    for(j = 0; j < npts; j++) {
+
+        if (nmatches[j] == 0) {
+            success[j] = 1;
+        }
+        else {
+
+            // get circles for this point
+            int ncircles = nmatches[j];
+            tids = (int *) malloc(ncircles * sizeof(int));
+            for (c = 0; c < ncircles; c++) {
+                tids[c] = matches[c];
+            }
+
+            /*
+             * The algorithms of calculating weights for Sibson and non-Sibsonian
+             * interpolations are quite different; in the first case, the weights are
+             * calculated by processing Delaunay triangles whose tricircles contain
+             * the interpolated point; in the second case, they are calculated by
+             * processing triplets of natural neighbours by moving clockwise or
+             * counterclockwise around the interpolated point.
+             */
+            if (nn_rule == SIBSON) {
+
+//                for (i = 0; i < nn->ncircles; ++i) {
+                for (i = 0; i < ncircles; ++i) {
+                    printf("%d | %d \n", j, i);
+                    // cuda: need to cudaize
+                    // todo: I think this needs to pass in the current point
+                    // i.e. p[j]
+                    nnpi_triangle_process(nn, p, tids[i]);
+                }
+
+                if (nn->bad != NULL) {
+                    int nentries = ht_getnentries(nn->bad);
+
+                    if (nentries > 0) {
+                        ht_process(nn->bad, free);
+                        success[j] = 0;
+                    }
+                }
+                success[j] = 1;
+            }
+
+
+                // todo implement non-sibsonian algorithm
+
+
+// else if (nn_rule == NON_SIBSONIAN) {
+//        int nneigh = 0;
+//        int* nids = NULL;
+//        int status;
+//
+//        nnpi_getneighbours(nn, p, nn->ncircles, tids, &nneigh, &nids);
+//        status = nnpi_neighbours_process(nn, p, nneigh, nids);
+//        free(nids);
+//
+//        return status;
+            else
+                nn_quit("programming error");
+
+        }
+
+    }
+}
+
+
+void nnpi_calculate_weights_all(nnpi* nn, point* p, int npts)
+{
+    point pp;
+    int nvertices = 0;
+    int* vertices = NULL;
+    double* weights = NULL;
+    int i;
+
+    nnpi_reset(nn);
+
+    int* success = (int*) malloc(npts * sizeof(int));
+    _nnpi_calculate_weights_all(nn, p, npts, success);
+
+    // todo: use the success values returned by the function above to normalize weights
+//    if (_nnpi_calculate_weights_all(nn, p, npts, success)) {
+
+        nnpi_normalize_weights(nn);
+
+//        cuda_nnpi_normalize_weights(nn);
+
+//        return;
+//    }
+
+    nnpi_reset(nn);
+
+    nn->dx = (nn->d->xmax - nn->d->xmin) * EPS_SHIFT;
+    nn->dy = (nn->d->ymax - nn->d->ymin) * EPS_SHIFT;
+
+    pp.x = p->x + nn->dx;
+    pp.y = p->y + nn->dy;
+
+    while (!_nnpi_calculate_weights(nn, &pp)) {
+        nnpi_reset(nn);
+        pp.x = p->x + nn->dx * RANDOM;
+        pp.y = p->y + nn->dy * RANDOM;
+    }
+    nnpi_normalize_weights(nn);
+
+    nvertices = nn->nvertices;
+    if (nvertices > 0) {
+        vertices = (int *) malloc(nvertices * sizeof(int));
+        memcpy(vertices, nn->vertices, nvertices * sizeof(int));
+        weights = (double *) malloc(nvertices * sizeof(double));
+        memcpy(weights, nn->weights, nvertices * sizeof(double));
+    }
+
+    nnpi_reset(nn);
+
+    pp.x = 2.0 * p->x - pp.x;
+    pp.y = 2.0 * p->y - pp.y;
+
+    while (!_nnpi_calculate_weights(nn, &pp) || nn->nvertices == 0) {
+        nnpi_reset(nn);
+        pp.x = p->x + nn->dx * RANDOM;
+        pp.y = p->y + nn->dy * RANDOM;
+    }
+    nnpi_normalize_weights(nn);
+
+    if (nvertices > 0)
+        for (i = 0; i < nn->nvertices; ++i)
+            nn->weights[i] /= 2.0;
+
+    for (i = 0; i < nvertices; ++i)
+        nnpi_add_weight(nn, vertices[i], weights[i] / 2.0);
+
+    if (nvertices > 0) {
+        free(vertices);
+        free(weights);
+    }
+}
+
+
+
+
+
+
+
+/* Performs Natural Neighbours interpolation in a point.
+ *
+ * @param nn NN interpolation
+ * @param p Point to be interpolated (p->x, p->y -- input; p->z -- output)
+ */
+// cuda function
+void nnpi_interpolate_point_all(nnpi* nn, point* p, int npts)
+{
+    delaunay* d = nn->d;
+    int i;
+
+    nnpi_calculate_weights_all(nn, p, npts);
+
+    nn->n++;
+
+    if (nn->nvertices == 0) {
+        p->z = NaN;
+        return;
+    }
+
+    p->z = 0.0;
+    for (i = 0; i < nn->nvertices; ++i) {
+        double weight = nn->weights[i];
+
+        if (weight < nn->wmin) {
+            p->z = NaN;
+            return;
+        }
+        p->z += d->points[nn->vertices[i]].z * weight;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #if defined(NNPHI_TEST)
 

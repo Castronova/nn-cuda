@@ -24,7 +24,7 @@ extern "C" {
 
 //int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir);
 int* cuda_delaunay_circles_find_all(delaunay* d, point* p, int npts);
-int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts);
+void cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts, int **matches, int **nmatches);
 void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_triangles, int** point_triangles,
                                                triangle* triangles, double* ptx, double* pty, int npts, double* cx, double* cy, double* cr,
                                                int* n_out, int** v_out);
@@ -41,7 +41,7 @@ void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_
 
 //int cuda_delaunay_circles_find_all(double pts[][2], int npts, double* cx, double* cy, double* cr, int n_cir);
 int* cuda_delaunay_circles_find_all(delaunay* d, point* p, int npts);
-int* cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts);
+void cuda_delaunay_circles_find_all_tricircles(delaunay* d, point* p, int npts, int **matches, int **nmatches);
 void cuda_find_neighboring_delaunay(double ntris, int* circle_ids, int* n_point_triangles, int** point_triangles,
                                     triangle* triangles, double* ptx, double* pty, int npts, double* cx, double* cy, double* cr,
                                     int* n_out, int** v_out);

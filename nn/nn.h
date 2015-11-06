@@ -368,4 +368,8 @@ extern char* nn_version;
  */
 extern int nn_test_vertice;
 
+
+void nnpi_interpolate_point_all(nnpi* nn, point* p, int npts);
+
+
 #endif                          /* _NN_H */
